@@ -28,7 +28,7 @@ class Reservation:
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
-        self.cost = self.calculate_cost()
+        self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
 
     def calculate_cost(self):
