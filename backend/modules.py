@@ -41,10 +41,10 @@ class ReservationCalendar:
     This class provides methods to load, retrieve, add, and remove reservations from a calendar.
 
     Attributes:
-        reservations (list of Reservation): A list of reservations.
+        reservations (dict of Reservation): A dict of reservations.
 
     Methods:
-        load_reservations(): Loads reservations from a data source.
+        load_reservations(): Loads reservations from a data source outside of backend folder at path: ../calendar.pkl.
         retrieve_by_date(daterange): Retrieves reservations by date range.
         retrieve_by_machine(daterange, machine): Retrieves reservations by machine within a date range.
         retrieve_by_customer(daterange, customer): Retrieves reservations by customer within a date range.
@@ -56,7 +56,13 @@ class ReservationCalendar:
         self.reservations = self.load_reservations()
         
     def load_reservations(self):
-        pass
+        try:
+            with open("../calendar.pkl", "rb") as f:
+                previous_calendar = pickle.load(f)
+                calendar = previous_calendar.reservations
+        except FileNotFoundError:
+            calendar = {}
+        return calendar
     
     def retrieve_by_date(self, daterange):
         pass

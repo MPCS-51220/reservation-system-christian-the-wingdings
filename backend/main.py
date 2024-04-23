@@ -9,5 +9,3 @@ calendar = ReservationCalendar()
 @app.get("/")
 def root():
     return {"message": "Hello World"}
-
-
