@@ -1,5 +1,7 @@
 import uuid
 import pickle
+from datetime import datetime, date
+
 
 class Reservation:
     '''
@@ -19,6 +21,7 @@ class Reservation:
     Methods:
         calculate_cost(): Calculates the total cost of the reservation.
         calculate_down_payment(): Calculates the required down payment.
+        calculate_discount(): Calculates any applicable discounts based on the reservation date and early bird of 13 days.
     '''
     def __init__(self, customer_name, machine_name, daterange):
         self.id = uuid.uuid4()
@@ -29,10 +32,24 @@ class Reservation:
         self.down_payment = self.calculate_down_payment()
 
     def calculate_cost(self):
-        pass
+
+        if self.machine == "harvester":
+            return 88000 # explicit cost for harvester as defined in the requirements
+        if self.machine == "scooper": 
+            return self.daterange.hours() * 1000 # cost per hour for scooper as defined in the requirements
+        if self.machine == "scanner":    
+            return self.daterange.hours() * 990 # cost per hour for scanner as defined in the requirements
+
+    def calculate_discount(self):
+        # Early bird discount of 25% if reservation is made more than 13 days in advance
+        if (self.daterange.start() - date.today()).days > 13:
+            return self.calculate_cost()*0.25
+        else:
+            return 0
     
     def calculate_down_payment(self):
-        pass
+        return self.cost * 0.5
+
 
 class ReservationCalendar:
     '''
@@ -103,7 +120,20 @@ class DateRange:
     Attributes:
         start_date (datetime.date): The start date of the range.
         end_date (datetime.date): The end date of the range.
+    
+    Methods:
+        hours(): Calculate the number of hours between the start and end date.
+
+
     '''
     def __init__(self, start_date, end_date):
         self.start_date = start_date
         self.end_date = end_date
+    
+    def hours(self):
+        # total hours
+        pass
+    
+    def start(self):
+        # return start date
+        return self.start_date
