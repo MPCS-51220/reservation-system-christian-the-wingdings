@@ -66,8 +66,8 @@ class ReservationCalendar:
     
     def retrieve_by_date(self, daterange):
         final_reservations = []
-        
-        for reservation in self.reservations:
+    
+        for reservation in self.reservations.values():
             if (reservation.daterange.start_date <= daterange.end_date and 
                 reservation.daterange.end_date >= daterange.start_date):
                 final_reservations.append(reservation)
@@ -76,8 +76,8 @@ class ReservationCalendar:
     
     def retrieve_by_machine(self, daterange, machine):
         final_reservations = []
-        
-        for reservation in self.reservations:
+    
+        for reservation in self.reservations.values():
             if (reservation.machine == machine and 
                 reservation.daterange.start_date <= daterange.end_date and 
                 reservation.daterange.end_date >= daterange.start_date):
@@ -87,8 +87,8 @@ class ReservationCalendar:
     
     def retrieve_by_customer(self, daterange, customer):
         final_reservations = []
-        
-        for reservation in self.reservations:
+    
+        for reservation in self.reservations.values():
             if (reservation.customer == customer and 
                 reservation.daterange.start_date <= daterange.end_date and 
                 reservation.daterange.end_date >= daterange.start_date):
