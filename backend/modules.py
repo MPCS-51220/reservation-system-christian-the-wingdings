@@ -1,5 +1,6 @@
 import uuid
 import pickle
+from datetime import datetime
 
 class Reservation:
     '''
@@ -19,6 +20,7 @@ class Reservation:
     Methods:
         calculate_cost(): Calculates the total cost of the reservation.
         calculate_down_payment(): Calculates the required down payment.
+        calculate_refund(): Calculates the refund for a cancelled reservation
     '''
     def __init__(self, customer_name, machine_name, daterange):
         self.id = uuid.uuid4()
@@ -33,6 +35,18 @@ class Reservation:
     
     def calculate_down_payment(self):
         pass
+
+    def calculate_refund(self):
+        advance_days = (self.daterange.start_date - datetime.now()).days
+        if advance_days >= 7:
+            refund = 0.75 * self.down_payment
+        elif advance_days >= 2:
+            refund = 0.5 * self.down_payment
+        else:
+            refund = 0
+        return refund
+
+
 
 class ReservationCalendar:
     '''
@@ -78,8 +92,10 @@ class ReservationCalendar:
     
     def remove_reservation(self, reservation_id):
         if reservation_id in self.reservations:
+            reservation = self.reservations[reservation_id]
+            refund = reservation.calculate_refund()
             del self.reservations[reservation_id]
-            return True
+            return refund
         return False
     
     def save_reservations(self):

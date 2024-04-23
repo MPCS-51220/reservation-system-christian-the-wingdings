@@ -30,9 +30,9 @@ def exit_handler(persist_status: bool = False):
 @app.delete("/reservations/{reservation_id}")
 def cancel_reservation(reservation_id: str):
 
-    success = calendar.remove_reservation(reservation_id)
-    if success:
-        return {"message": "Reservation deleted successfully"}
+    refund = calendar.remove_reservation(reservation_id)
+    if refund:
+        return {"message": "Reservation deleted successfully", "refund": refund}
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                 detail="Reservation not found") 
     
