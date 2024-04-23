@@ -80,7 +80,21 @@ class ReservationCalendar:
         pass
     
     def save_reservations(self):
-        pass
+        try:
+            with open("../calendar.pkl", "wb") as f:
+                pickle.dump(self, f)
+                
+        except (OSError, IOError) as e:
+            raise Exception(f'Error saving reservations to file.\n{e}')
+        
+        except pickle.PicklingError as e:
+            raise Exception(f'Error pickling reservations.\{e}')
+
+        except Exception as e:
+            raise Exception(f'An uncexpected error occurred saving reservations.\n{e}')
+        
+        else:
+            return 'success'
 
 class DateRange:
     '''
