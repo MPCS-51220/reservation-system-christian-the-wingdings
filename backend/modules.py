@@ -37,6 +37,7 @@ class Reservation:
         pass
 
     def calculate_refund(self):
+        # calculate refund based on number of advance days of cancellation
         advance_days = (self.daterange.start_date - datetime.now()).days
         if advance_days >= 7:
             refund = 0.75 * self.down_payment
