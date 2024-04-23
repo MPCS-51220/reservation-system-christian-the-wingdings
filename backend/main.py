@@ -39,7 +39,7 @@ def get_reservations_by_customer(customer_name: str,
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
         
         if reservations:
-            return {"reservations": [reservation.__dict__ for reservation in reservations]}
+            return {"reservations":[vars(reservation) for reservation in reservations]}
         else:
             return {"message": "No reservations found for this customer."}
         
@@ -59,7 +59,7 @@ def get_reservations_by_machine(machine_name: str,
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
         
         if reservations:
-            return {"reservations": [reservation.__dict__ for reservation in reservations]}
+            return {"reservations":[vars(reservation) for reservation in reservations]}
         else:
             return {"message": "No reservations found for this machine."}
         
