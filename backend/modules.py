@@ -42,7 +42,7 @@ class Reservation:
 
     def calculate_discount(self):
         # Early bird discount of 25% if reservation is made more than 13 days in advance
-        if (self.daterange.start() - date.today()).days > 13:
+        if (self.daterange.start_date - date.today()).days > 13:
             return self.calculate_cost()*0.25
         else:
             return 0
@@ -123,17 +123,18 @@ class DateRange:
     
     Methods:
         hours(): Calculate the number of hours between the start and end date.
+        start(): Return the start date of the range.
 
 
     '''
     def __init__(self, start_date, end_date):
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+        self.end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    def __eq__(self, other) -> bool:
+        # two date ranges are equal if their is any overlap between them
+        return (self.start_date <= other.end_date and self.end_date >= other.start_date) or \
+        (other.start_date <= self.end_date and other.end_date >= self.start_date)
     
     def hours(self):
-        # total hours
-        pass
-    
-    def start(self):
-        # return start date
-        return self.start_date
+        return int((self.end_date - self.start_date).total_seconds() / 3600)
