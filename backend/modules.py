@@ -49,7 +49,7 @@ class ReservationCalendar:
         retrieve_by_machine(daterange, machine): Retrieves reservations by machine within a date range.
         retrieve_by_customer(daterange, customer): Retrieves reservations by customer within a date range.
         add_reservation(reservation): Adds a new reservation to the calendar.
-        remove_reservation(reservation): Removes a reservation from the calendar.
+        remove_reservation(reservation_id): Removes a reservation from the calendar.
         save_reservations(): Saves current reservations to a data source.
     '''
     def __init__(self):
@@ -76,8 +76,11 @@ class ReservationCalendar:
     def add_reservation(self, reservation):
         pass
     
-    def remove_reservation(self, reservation):
-        pass
+    def remove_reservation(self, reservation_id):
+        if reservation_id in self.reservations:
+            del self.reservations[reservation_id]
+            return True
+        return False
     
     def save_reservations(self):
         try:
