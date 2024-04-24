@@ -2,7 +2,6 @@ import uuid
 import pickle
 from datetime import datetime, date
 
-
 class Reservation:
     '''
     A class to manage information assiciated with a single reservation for a machine.
@@ -21,7 +20,7 @@ class Reservation:
     Methods:
         calculate_cost(): Calculates the total cost of the reservation.
         calculate_down_payment(): Calculates the required down payment.
-        calculate_discount(): Calculates any applicable discounts based on the reservation date and early bird of 13 days.
+        calculate_refund(): Calculates the refund for a cancelled reservation
     '''
     def __init__(self, customer_name, machine_name, daterange):
         self.id = uuid.uuid4()
@@ -51,6 +50,19 @@ class Reservation:
         return self.cost * 0.5
 
 
+    def calculate_refund(self):
+        # calculate refund based on number of advance days of cancellation
+        advance_days = (self.daterange.start_date - datetime.now()).days
+        if advance_days >= 7:
+            refund = 0.75 * self.down_payment
+        elif advance_days >= 2:
+            refund = 0.5 * self.down_payment
+        else:
+            refund = 0
+        return refund
+
+
+
 class ReservationCalendar:
     '''
     A class to manage a collection of reservations.
@@ -66,7 +78,7 @@ class ReservationCalendar:
         retrieve_by_machine(daterange, machine): Retrieves reservations by machine within a date range.
         retrieve_by_customer(daterange, customer): Retrieves reservations by customer within a date range.
         add_reservation(reservation): Adds a new reservation to the calendar.
-        remove_reservation(reservation): Removes a reservation from the calendar.
+        remove_reservation(reservation_id): Removes a reservation from the calendar.
         save_reservations(): Saves current reservations to a data source.
     '''
     def __init__(self):
@@ -93,8 +105,13 @@ class ReservationCalendar:
     def add_reservation(self, reservation):
         pass
     
-    def remove_reservation(self, reservation):
-        pass
+    def remove_reservation(self, reservation_id):
+        if reservation_id in self.reservations:
+            reservation = self.reservations[reservation_id]
+            refund = reservation.calculate_refund()
+            del self.reservations[reservation_id]
+            return refund
+        return False
     
     def save_reservations(self):
         try:
