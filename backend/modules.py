@@ -1,6 +1,6 @@
 import uuid
 import pickle
-from datetime import datetime
+from datetime import datetime, date
 
 class Reservation:
     '''
@@ -27,14 +27,28 @@ class Reservation:
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
-        self.cost = self.calculate_cost()
+        self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
 
     def calculate_cost(self):
-        pass
+
+        if self.machine == "harvester":
+            return 88000 # explicit cost for harvester as defined in the requirements
+        if self.machine == "scooper": 
+            return self.daterange.hours() * 1000 # cost per hour for scooper as defined in the requirements
+        if self.machine == "scanner":    
+            return self.daterange.hours() * 990 # cost per hour for scanner as defined in the requirements
+
+    def calculate_discount(self):
+        # Early bird discount of 25% if reservation is made more than 13 days in advance
+        if (self.daterange.start_date - date.today()).days > 13:
+            return self.calculate_cost()*0.25
+        else:
+            return 0
     
     def calculate_down_payment(self):
-        pass
+        return self.cost * 0.5
+
 
     def calculate_refund(self):
         # calculate refund based on number of advance days of cancellation
