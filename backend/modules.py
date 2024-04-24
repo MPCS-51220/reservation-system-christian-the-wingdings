@@ -1,5 +1,6 @@
 import uuid
 import pickle
+from datetime import datetime, date
 
 class Reservation:
     '''
@@ -19,20 +20,48 @@ class Reservation:
     Methods:
         calculate_cost(): Calculates the total cost of the reservation.
         calculate_down_payment(): Calculates the required down payment.
+        calculate_refund(): Calculates the refund for a cancelled reservation
     '''
     def __init__(self, customer_name, machine_name, daterange):
         self.id = uuid.uuid4()
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
-        self.cost = self.calculate_cost()
+        self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
 
     def calculate_cost(self):
-        pass
+
+        if self.machine == "harvester":
+            return 88000 # explicit cost for harvester as defined in the requirements
+        if self.machine == "scooper": 
+            return self.daterange.hours() * 1000 # cost per hour for scooper as defined in the requirements
+        if self.machine == "scanner":    
+            return self.daterange.hours() * 990 # cost per hour for scanner as defined in the requirements
+
+    def calculate_discount(self):
+        # Early bird discount of 25% if reservation is made more than 13 days in advance
+        if (self.daterange.start_date - date.today()).days > 13:
+            return self.calculate_cost()*0.25
+        else:
+            return 0
     
     def calculate_down_payment(self):
-        pass
+        return self.cost * 0.5
+
+
+    def calculate_refund(self):
+        # calculate refund based on number of advance days of cancellation
+        advance_days = (self.daterange.start_date - datetime.now()).days
+        if advance_days >= 7:
+            refund = 0.75 * self.down_payment
+        elif advance_days >= 2:
+            refund = 0.5 * self.down_payment
+        else:
+            refund = 0
+        return refund
+
+
 
 class ReservationCalendar:
     '''
@@ -49,7 +78,7 @@ class ReservationCalendar:
         retrieve_by_machine(daterange, machine): Retrieves reservations by machine within a date range.
         retrieve_by_customer(daterange, customer): Retrieves reservations by customer within a date range.
         add_reservation(reservation): Adds a new reservation to the calendar.
-        remove_reservation(reservation): Removes a reservation from the calendar.
+        remove_reservation(reservation_id): Removes a reservation from the calendar.
         save_reservations(): Saves current reservations to a data source.
     '''
     def __init__(self):
@@ -99,8 +128,13 @@ class ReservationCalendar:
     def add_reservation(self, reservation):
         pass
     
-    def remove_reservation(self, reservation):
-        pass
+    def remove_reservation(self, reservation_id):
+        if reservation_id in self.reservations:
+            reservation = self.reservations[reservation_id]
+            refund = reservation.calculate_refund()
+            del self.reservations[reservation_id]
+            return refund
+        return False
     
     def save_reservations(self):
         try:
@@ -126,7 +160,21 @@ class DateRange:
     Attributes:
         start_date (datetime.date): The start date of the range.
         end_date (datetime.date): The end date of the range.
+    
+    Methods:
+        hours(): Calculate the number of hours between the start and end date.
+        start(): Return the start date of the range.
+
+
     '''
     def __init__(self, start_date, end_date):
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+        self.end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    def __eq__(self, other) -> bool:
+        # two date ranges are equal if their is any overlap between them
+        return (self.start_date <= other.end_date and self.end_date >= other.start_date) or \
+        (other.start_date <= self.end_date and other.end_date >= self.start_date)
+    
+    def hours(self):
+        return int((self.end_date - self.start_date).total_seconds() / 3600)
