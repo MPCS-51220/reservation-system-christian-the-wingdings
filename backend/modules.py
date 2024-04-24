@@ -158,8 +158,8 @@ class DateRange:
     A class to represent a range of dates and handle their formatting and comparison.
 
     Attributes:
-        start_date (datetime.date): The start date of the range.
-        end_date (datetime.date): The end date of the range.
+        start_date (datetime): The start date of the range.
+        end_date (datetime): The end date of the range.
     
     Methods:
         hours(): Calculate the number of hours between the start and end date.

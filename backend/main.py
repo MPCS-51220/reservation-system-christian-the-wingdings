@@ -92,7 +92,7 @@ def cancel_reservation(reservation_id: str):
                 detail="Reservation not found") 
     
 @app.get("/reservations")
-def get_reservations_by_date(start: datetime = Query(None), end: datetime = Query(None)): 
+def get_reservations_by_date(start: str = Query(None), end: str = Query(None)): 
 
     if not start or not end: # url parameters missing
          raise HTTPException(status_code=400, detail="Start and end dates are required") 
