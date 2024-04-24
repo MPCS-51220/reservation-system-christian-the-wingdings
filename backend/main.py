@@ -39,6 +39,48 @@ def exit_handler(persist_status: bool = False):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to save changes due to {e}')
+
+
+@app.get("/reservations/customers/{customer_name}")
+def get_reservations_by_customer(customer_name: str, 
+                                  start: str = Query(..., description="Start date of the reservation period"),
+                                  end: str = Query(..., description="End date of the reservation period")):
+    try:
+        if start and end:
+            daterange = DateRange(start, end)
+            reservations = calendar.retrieve_by_customer(daterange, customer_name)
+        else:
+            raise HTTPException(status_code=400, detail="Both start and end dates are required")
+        
+        if reservations:
+            return {"reservations":[vars(reservation) for reservation in reservations]}
+        else:
+            return {"message": "No reservations found for this customer."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to get reservations due to {e}')
+    
+@app.get("/reservations/machines/{machine_name}")
+def get_reservations_by_machine(machine_name: str, 
+                                  start: str = Query(..., description="Start date of the reservation period"),
+                                  end: str = Query(..., description="End date of the reservation period")):
+    try:
+        if start and end:
+            daterange = DateRange(start, end)
+            reservations = calendar.retrieve_by_machine(daterange, machine_name)
+        else:
+            raise HTTPException(status_code=400, detail="Both start and end dates are required")
+        
+        if reservations:
+            return {"reservations":[vars(reservation) for reservation in reservations]}
+        else:
+            return {"message": "No reservations found for this machine."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to get reservations due to {e}')
+
     
 @app.delete("/reservations/{reservation_id}")
 def cancel_reservation(reservation_id: str):
