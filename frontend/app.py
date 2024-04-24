@@ -26,8 +26,8 @@ def make_reservation():
         machine = get_machine_choice()
         if not machine:
             return    
-        start_date = input("\nEnter start date (YYYY-MM-DD): ")
-        end_date = input("\nEnter end date (YYYY-MM-DD): ")
+        start_date = input("\nEnter start date (YYYY-MM-DD HH:MM): ")
+        end_date = input("\nEnter end date (YYYY-MM-DD HH:MM): ")
 
         data ={
             "customer": customer_name,
@@ -62,8 +62,8 @@ def list_reservations():
     print("2. List the reservations for a given machine for a given date range\n")
     print("3. List the reservations for a given customer for a given date range\n\n")
     choice = input("\nEnter your choice: ")
-    start_date = input("\nEnter start date (YYYY-MM-DD)  :")
-    end_date = input("\nEnter end date (YYYY-MM-DD)  :")
+    start_date = input("\nEnter start date (YYYY-MM-DD HH:MM)  :")
+    end_date = input("\nEnter end date (YYYY-MM-DD HH:MM)  :")
     params = {
         "start": start_date,
         "end": end_date
