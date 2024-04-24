@@ -121,9 +121,23 @@ class DateRange:
     A class to represent a range of dates and handle their formatting and comparison.
 
     Attributes:
-        start_date (datetime.date): The start date of the range.
-        end_date (datetime.date): The end date of the range.
+        start_date (datetime): The start date of the range.
+        end_date (datetime): The end date of the range.
+    
+    Methods:
+        hours(): Calculate the number of hours between the start and end date.
+        start(): Return the start date of the range.
+
+
     '''
     def __init__(self, start_date, end_date):
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
+        self.end_date = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
+
+    def __eq__(self, other) -> bool:
+        # two date ranges are equal if their is any overlap between them
+        return (self.start_date <= other.end_date and self.end_date >= other.start_date) or \
+        (other.start_date <= self.end_date and other.end_date >= self.start_date)
+    
+    def hours(self):
+        return int((self.end_date - self.start_date).total_seconds() / 3600)
