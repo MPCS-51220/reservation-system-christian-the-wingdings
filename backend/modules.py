@@ -168,8 +168,8 @@ class DateRange:
 
     '''
     def __init__(self, start_date, end_date):
-        self.start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
-        self.end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+        self.start_date = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
+        self.end_date = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
 
     def __eq__(self, other) -> bool:
         # two date ranges are equal if their is any overlap between them

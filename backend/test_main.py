@@ -7,8 +7,8 @@ client = TestClient(app)
 
 def test_get_reservations_by_customer_with_dates():
     # I am assuming there is a customer named "Nikola" with reservations in the date range
-    start_date = datetime(2024, 1, 1).isoformat()
-    end_date = datetime(2024, 1, 31).isoformat()
+    start_date = "2024-01-01 11:00"
+    end_date = "2024-01-31 11:00"
     response = client.get(f"/reservations/customers/Nikola?start={start_date}&end={end_date}")
     assert response.status_code == 200
 
@@ -19,8 +19,8 @@ def test_get_reservations_by_customer_with_dates():
 def test_get_reservations_by_customer_with_dates_fail():
     with pytest.raises(AssertionError):
         # I am assuming there is no customer named "Jamal" with reservations in the date range
-        start_date = datetime(2024, 1, 1).isoformat()
-        end_date = datetime(2024, 1, 31).isoformat()
+        start_date = "2024-01-01 11:00"
+        end_date = "2024-01-31 11:00"
         response = client.get(f"/reservations/customers/Jamal?start={start_date}&end={end_date}")
         assert response.status_code == 200
 
@@ -30,8 +30,8 @@ def test_get_reservations_by_customer_with_dates_fail():
 
 def test_get_reservations_by_machine_with_dates():
     # I am assuming there is a machine named "Scanner" with reservations
-    start_date = datetime(2024, 1, 1).isoformat()
-    end_date = datetime(2024, 1, 31).isoformat()
+    start_date = "2024-01-01 11:00"
+    end_date = "2024-01-31 11:00"
     response = client.get(f"/reservations/machines/Scanner?start={start_date}&end={end_date}")
     assert response.status_code == 200
 
@@ -42,8 +42,8 @@ def test_get_reservations_by_machine_with_dates():
 def test_get_reservations_by_machine_with_dates_fail():
     with pytest.raises(AssertionError):
         # I am assuming there is no machine named "Blastinator" with reservations
-        start_date = datetime(2024, 1, 1).isoformat()
-        end_date = datetime(2024, 1, 31).isoformat()
+        start_date = "2024-01-01 11:00"
+        end_date = "2024-01-31 11:00"
         response = client.get(f"/reservations/machines/Blastinator?start={start_date}&end={end_date}")
         assert response.status_code == 200
 

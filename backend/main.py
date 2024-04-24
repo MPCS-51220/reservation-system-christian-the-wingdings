@@ -43,8 +43,8 @@ def exit_handler(persist_status: bool = False):
 
 @app.get("/reservations/customers/{customer_name}")
 def get_reservations_by_customer(customer_name: str, 
-                                  start: datetime = Query(..., description="Start date of the reservation period"),
-                                  end: datetime = Query(..., description="End date of the reservation period")):
+                                  start: str = Query(..., description="Start date of the reservation period"),
+                                  end: str = Query(..., description="End date of the reservation period")):
     try:
         if start and end:
             daterange = DateRange(start, end)
@@ -63,8 +63,8 @@ def get_reservations_by_customer(customer_name: str,
     
 @app.get("/reservations/machines/{machine_name}")
 def get_reservations_by_machine(machine_name: str, 
-                                  start: datetime = Query(..., description="Start date of the reservation period"),
-                                  end: datetime = Query(..., description="End date of the reservation period")):
+                                  start: str = Query(..., description="Start date of the reservation period"),
+                                  end: str = Query(..., description="End date of the reservation period")):
     try:
         if start and end:
             daterange = DateRange(start, end)
