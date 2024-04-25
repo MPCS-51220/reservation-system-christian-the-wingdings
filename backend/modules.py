@@ -41,7 +41,7 @@ class Reservation:
 
     def calculate_discount(self):
         # Early bird discount of 25% if reservation is made more than 13 days in advance
-        if (self.daterange.start_date - date.today()).days > 13:
+        if (self.daterange.start_date - datetime.now()).days > 13:
             return self.calculate_cost()*0.25
         else:
             return 0
