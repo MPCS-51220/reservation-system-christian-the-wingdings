@@ -13,16 +13,16 @@ Welcome to the Equipment Reservation System! This system is designed to help use
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
-    - [Making a Reservation](#make-reservation)
+    - [Making a Reservation](#making-a-reservation)
     - [Cancelling a Reservation](#cancelling-a-reservation)
     - [Listing Reservations](#listing-reservations)
     - [Exiting the System](#exiting-the-system)
 - [API Reference](#api-reference)
-    - [Post Reservation](#post-/reservations)
-    - [Delete Reservation](#delete-/reservations)
-    - [GET Reservations](#get-/reservations)
-        - [GET Reservations By Machine](#get-/reservations/machines)
-        - [GET Reservations By Customer](#get-reservations/customers)
+    - [Post Reservation](#post-reservations)
+    - [Delete Reservation](#delete-reservations)
+    - [GET Reservations](#get-reservations)
+    - [GET Reservations By Machine](#get-reservations/machines)
+    - [GET Reservations By Customer](#get-reservations/customers)
     <!-- - [Exiting the System](#exiting-the-system) -->
 - [Contributing](#contributing)
 
@@ -98,7 +98,7 @@ The Equipment Reservation System is accessed through a command-line interface. B
 
 This section details the available endpoints within the Equipment Reservation System, examples of successful responses, and errors that might occur during each operation.
 
-### POST /reservations
+### POST Reservations
 
 Creates a new equipment reservation.
 
@@ -108,7 +108,7 @@ Creates a new equipment reservation.
   - `start_date`: datetime (required)
   - `end_date`: datetime (required)
 
-### DELETE /reservations
+### DELETE Reservations
 
 Cancels an existing reservation.
 
@@ -122,7 +122,7 @@ Lists all current reservations in a date range.
   - `start_date`: str (required)
   - `end_date`: str (required)
 
-### GET /reservations/machines
+### GET Reservations/Machines
 
 Lists all reservations for a specific machine.
 
@@ -131,7 +131,7 @@ Lists all reservations for a specific machine.
   - `start_date`: str (required)
   - `end_date`: str (required)
 
-### GET /reservations/customers
+### GET Reservations/Customers
 
 Lists all reservations for a specific customer.
 
