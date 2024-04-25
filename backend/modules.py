@@ -29,7 +29,6 @@ class Reservation:
         self.daterange = daterange
         self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
-        self.is_valid = self.verify_reservation()
 
     def calculate_cost(self):
 
@@ -61,13 +60,7 @@ class Reservation:
         else:
             refund = 0
         return refund
-    
-    def verify_reservation(self):
-        
-        if not self.check_business_hours():
-            return False
-        
-        
+
 
 
 
