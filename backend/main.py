@@ -99,11 +99,11 @@ def cancel_reservation(reservation_id: str):
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                 detail="Reservation not found") 
     
-@app.get("/reservations")
+@app.get("/reservations", status_code=status.HTTP_200_OK)
 def get_reservations_by_date(start: str = Query(None), end: str = Query(None)): 
 
     if not start or not end: # url parameters missing
-         raise HTTPException(status_code=400, detail="Start and end dates are required") 
+        raise HTTPException(status_code=400, detail="Start and end dates are required") 
     date_range = DateRange(start, end)
     reservations = calendar.retrieve_by_date(date_range)
     if reservations:

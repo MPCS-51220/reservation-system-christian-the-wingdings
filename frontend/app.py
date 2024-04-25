@@ -40,9 +40,10 @@ def make_reservation():
         if response.status_code == 201:
             print("\nReservation added successfully")
         else:
-            print(response.json()['detail']) # print HTTPException message
+            error_detail = response.json().get('detail', 'Unknown error occurred')
+            print(f"Error occurred while adding reservation: {error_detail}")
     except Exception as e:
-        print("Error occurred while adding reservation ", str(e))
+        print(f"Error occurred while adding reservation: {str(e)}")
 
 def cancel_reservation():
     try:
@@ -88,8 +89,9 @@ def list_reservations():
             return
 
         if response.status_code == 200:
-            if 'reservations' in response: # reservations have been returned
-                print(response.json()['reservations'])
+            reservations_data = response.json()
+            if 'reservations' in reservations_data:
+                print(reservations_data['reservations'])
             else: # no reservations found
                 print(response.json()['message'])
 
