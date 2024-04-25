@@ -87,3 +87,15 @@ def test_get_no_reservations_by_date():
     assert 'message' in response.json()
     assert response.json()['message'] == "No reservations found in this date range"
 
+def test_post_reservation():
+    data = {
+        "customer_name": "testcustomer",
+        "machine_name": "scanner",
+        "start_date": "2024-04-25 11:00",
+        "end_date": "2024-04-25 11:30"
+    }
+    
+    response = client.post("/reservations", json=data)
+    assert response.status_code == 201
+    assert 'message' in response.json()
+    assert response.json()['message'] == "Reservation added successfully!"
