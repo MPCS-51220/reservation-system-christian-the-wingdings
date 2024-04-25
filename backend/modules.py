@@ -29,6 +29,7 @@ class Reservation:
         self.daterange = daterange
         self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
+        self.is_valid = self.verify_reservation()
 
     def calculate_cost(self):
 
@@ -60,6 +61,13 @@ class Reservation:
         else:
             refund = 0
         return refund
+    
+    def verify_reservation(self):
+        
+        if not self.check_business_hours():
+            return False
+        
+        
 
 
 
@@ -126,7 +134,9 @@ class ReservationCalendar:
         return final_reservations
     
     def add_reservation(self, reservation):
-        pass
+        self._verify_business_hours(reservation)
+        self._check_equipment_availability(reservation)
+        self.reservations[reservation.id] = reservation
     
     def remove_reservation(self, reservation_id):
         if reservation_id in self.reservations:
@@ -152,6 +162,67 @@ class ReservationCalendar:
         
         else:
             return 'success'
+
+    def _verify_business_hours(self, reservation):
+        # Check if the reservation is on a Sunday
+        if reservation.daterange.start_date.weekday() == 6:
+            raise ValueError("Reservations cannot be made on Sundays.")
+
+        # Check Saturday hours
+        if reservation.daterange.start_date.weekday() == 5:
+            if (reservation.daterange.start_date.time() > datetime.strptime("16:00", "%H:%M").time() or
+                reservation.daterange.end_date.time() > datetime.strptime("16:00", "%H:%M").time() or
+                reservation.daterange.start_date.time() < datetime.strptime("10:00", "%H:%M").time() or
+                reservation.daterange.end_date.time() < datetime.strptime("10:00", "%H:%M").time()):
+                raise ValueError("Reservations on Saturdays must be between 10:00 and 16:00.")
+
+        # Check weekday hours
+        if reservation.daterange.start_date.weekday() < 5:
+            if (reservation.daterange.start_date.time() < datetime.strptime("9:00", "%H:%M").time() or
+                reservation.daterange.end_date.time() > datetime.strptime("18:00", "%H:%M").time()):
+                raise ValueError("Reservations on weekdays must be between 9:00 and 18:00.")
+
+        # Check if the reservation is more than 30 days in advance
+        if (reservation.daterange.start_date.date() - date.today()).days > 30:
+            raise ValueError("Reservations cannot be made more than 30 days in advance.")
+        
+    def _check_equipment_availability(self, reservation):
+        overlapping_reservations = self.retrieve_by_date(reservation.daterange)
+
+        # Count how many scanners, harvesters, and scoopers are reserved in the overlapping period
+        scanner_count = 0
+        harvester_reserved = False
+        scooper_count = 0
+
+        for res in overlapping_reservations:
+            if res.machine == "scanner":
+                scanner_count += 1
+            if res.machine == "harvester":
+                harvester_reserved = True
+            if res.machine == "scooper":
+                scooper_count += 1
+
+        # Check constraints for scanners
+        if reservation.machine == "scanner":
+            if scanner_count >= 3:
+                raise ValueError("Maximum number of scanners already reserved for this time period.")
+            if harvester_reserved:
+                raise ValueError("Scanners cannot operate while the harvester is in use.")
+
+        # Check if the reservation is for a harvester and if any scanner is reserved
+        if reservation.machine == "harvester":
+            if scanner_count > 0:
+                raise ValueError("The harvester cannot operate while scanners are in use.")
+
+        # Check constraints for scoopers
+        if reservation.machine == "scooper":
+            if scooper_count >= 3:  # Since there are 4 scoopers, we can reserve up to 3 at the same time
+                raise ValueError("Only one scooper must remain available; maximum number already reserved.")
+
+        # General check for other machines (if more types are added in the future)
+        if reservation.machine not in ["scanner", "harvester", "scooper"]:
+            raise ValueError("Please select from one of our specified machines: scanner, harvester, scooper.")
+
 
 class DateRange:
     '''
