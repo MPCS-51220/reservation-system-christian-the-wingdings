@@ -94,7 +94,7 @@ def get_reservations_by_machine(machine_name: str,
 def cancel_reservation(reservation_id: str):
 
     refund = calendar.remove_reservation(reservation_id)
-    if refund: # reservation was removed and refund amount returned
+    if refund is not False: # reservation was removed and refund amount returned
         return {"message": "Reservation cancelled successfully", "refund": refund}
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                 detail="Reservation not found") 
