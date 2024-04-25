@@ -18,7 +18,7 @@ calendar = ReservationCalendar()
 def root():
     return {"message": "Hello World"}
 
-@app.post("/reservations")
+@app.post("/reservations", status_code=status.HTTP_201_CREATED)
 def add_reservation(reservation_request: ReservationRequest):
     
     try:
@@ -32,7 +32,7 @@ def add_reservation(reservation_request: ReservationRequest):
                             detail=f'Failed to add reservation due to {e}')
 
 
-@app.get("/exit")
+@app.get("/exit", status_code=status.HTTP_200_OK)
 def exit_handler(persist_status: bool = False):
     try:
         if persist_status is True:
@@ -49,7 +49,7 @@ def exit_handler(persist_status: bool = False):
                     detail=f'Failed to save changes due to {e}')
 
 
-@app.get("/reservations/customers/{customer_name}")
+@app.get("/reservations/customers/{customer_name}", status_code=status.HTTP_200_OK)
 def get_reservations_by_customer(customer_name: str, 
                                   start: str = Query(..., description="Start date of the reservation period"),
                                   end: str = Query(..., description="End date of the reservation period")):
@@ -69,7 +69,7 @@ def get_reservations_by_customer(customer_name: str,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to get reservations due to {e}')
     
-@app.get("/reservations/machines/{machine_name}")
+@app.get("/reservations/machines/{machine_name}", status_code=status.HTTP_200_OK)
 def get_reservations_by_machine(machine_name: str, 
                                   start: str = Query(..., description="Start date of the reservation period"),
                                   end: str = Query(..., description="End date of the reservation period")):
@@ -90,7 +90,7 @@ def get_reservations_by_machine(machine_name: str,
                     detail=f'Failed to get reservations due to {e}')
 
     
-@app.delete("/reservations/{reservation_id}")
+@app.delete("/reservations/{reservation_id}", status_code=status.HTTP_200_OK)
 def cancel_reservation(reservation_id: str):
 
     refund = calendar.remove_reservation(reservation_id)
