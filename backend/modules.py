@@ -84,18 +84,19 @@ class ReservationCalendar:
     '''
     def __init__(self):
         self.reservations = self.load_reservations()
-        self.load_test_data([
-                        {'start_date': '2024-04-29 10:00',
-                                'end_date': '2024-04-29 12:00',
-                                'customer_name': "Nikola",
-                                'machine_name': "scanner"
-                                },
-                        {'start_date': "2024-04-29 10:00",
-                                'end_date': "2024-04-29 12:00",
-                                'customer_name': "testcustomer",
-                                'machine_name': "scanner"
-                                }
-                                ])
+        if self.reservations == {}: # Load test data if no reservations are found   
+            self.load_test_data([
+                            {'start_date': '2024-04-29 10:00',
+                                    'end_date': '2024-04-29 12:00',
+                                    'customer_name': "Nikola",
+                                    'machine_name': "scanner"
+                                    },
+                            {'start_date': "2024-04-29 10:00",
+                                    'end_date': "2024-04-29 12:00",
+                                    'customer_name': "testcustomer",
+                                    'machine_name': "scanner"
+                                    }
+                                    ])
         
         
     def load_reservations(self):
