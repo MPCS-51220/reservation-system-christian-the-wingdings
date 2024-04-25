@@ -62,8 +62,6 @@ class Reservation:
         return refund
 
 
-
-
 class ReservationCalendar:
     '''
     A class to manage a collection of reservations.
