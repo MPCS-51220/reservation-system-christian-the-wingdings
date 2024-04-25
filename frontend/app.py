@@ -91,7 +91,8 @@ def list_reservations():
         if response.status_code == 200:
             reservations_data = response.json()
             if 'reservations' in reservations_data:
-                print(reservations_data['reservations'])
+                data = reservations_data['reservations']
+                print(json.dumps(data, indent=2))
             else: # no reservations found
                 print(response.json()['message'])
 
