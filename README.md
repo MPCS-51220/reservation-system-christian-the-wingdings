@@ -18,11 +18,11 @@ Welcome to the Equipment Reservation System! This system is designed to help use
     - [Listing Reservations](#listing-reservations)
     - [Exiting the System](#exiting-the-system)
 - [API Reference](#api-reference)
-    - [Post a Reservation](#post-/reservations)
-    - [Delete a Reservation](#delete-/reservations)
-    - [Listing Reservations](#get-/reservations)
-        - [By Machine](#get-/reservations/machines)
-        - [By Customer](#get-reservations/customers)
+    - [Post Reservation](#post-/reservations)
+    - [Delete Reservation](#delete-/reservations)
+    - [GET Reservations](#get-/reservations)
+        - [GET Reservations By Machine](#get-/reservations/machines)
+        - [GET Reservations By Customer](#get-reservations/customers)
     <!-- - [Exiting the System](#exiting-the-system) -->
 - [Contributing](#contributing)
 
@@ -70,29 +70,29 @@ BASE_URL = "http://localhost:8000"
 The Equipment Reservation System is accessed through a command-line interface. Below are the commands and instructions on how to use them.
 
 ### Making a Reservation
-Select 'Make reservation' by entering 1 from the main menu.
 
-    Enter the required details:
-        Customer name.
-        Machine choice 1 - 3.
-        Start and end date/time for the reservation. formated YYYY-MM-DD HH:mm
+    Select 'Make reservation' by entering 1 from the main menu.
+    Enter the required details:(Customer Name, Machine choice, Start Date and Time, End Date and Time)
+    The system will confirm upon success.
+*NOTE start/end is formated YYYY-MM-DD HH:MM*
 
 ### Cancelling a Reservation
-
-    Select 'Cancel reservation' from the main menu.
+    
+    Select 'Cancel reservation' by entering 2 from the main menu.
     Enter the ID of the reservation you wish to cancel.
-        The system will confirm the cancellation and show any applicable refund.
+    The system will confirm the cancellation and show any applicable refund.
 
 ### Listing Reservations
 
-    Select 'List reservations' from the main menu.
+    Select 'List reservations' by entering 3 from the main menu.
     Choose the type of listing you need (by date, machine, or customer).
     Enter the required parameters based on your selection.
 
 ### Exiting the System
 
-    Select 'Quit' from the main menu.
+    Select 'Quit' by entering 4 from the main menu.
     Choose whether to save changes (if applicable).
+*NOTE: calendar object will be saved as calendar.pkl in the main repo directory*
 
 ## API Reference
 
@@ -102,112 +102,43 @@ This section details the available endpoints within the Equipment Reservation Sy
 
 Creates a new equipment reservation.
 
-- **Request Body**:
+- **Parameters**:
   - `customer_name`: string (required)
   - `machine_type`: string (required)
   - `start_date`: datetime (required)
   - `end_date`: datetime (required)
 
-- **Example of Successful Response**:
-  ```json
-  {
-    "success": true,
-    "id": 1,
-    "message": "Reservation created successfully."
-  }
-  ```
-
-- **Possible Errors**:
-  - `ValidationError`: Occurs when there is missing or invalid data in the request.
-  - `DatabaseError`: If there is an issue connecting to or querying the database.
-  - `UnavailableEquipmentError`: If the requested equipment is not available for the specified date/time.
-
 ### DELETE /reservations
 
 Cancels an existing reservation.
 
-- **URL Parameters**:
+- **Parameters**:
   - `reservation_id`: int (required)
-
-- **Example of Successful Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Reservation cancelled successfully."
-  }
-  ```
-
-- **Possible Errors**:
-  - `ReservationNotFoundError`: If the reservation with the specified ID does not exist.
-  - `DatabaseError`: If there is an issue connecting to or querying the database.
 
 ### GET /reservations
 
-Lists all current reservations.
-
-- **Example of Successful Response**:
-  ```json
-  [
-    {
-      "id": 1,
-      "customer_name": "John Doe",
-      "machine_type": "scanner",
-      "start_date": "2024-01-01T09:00:00Z",
-      "end_date": "2024-01-02T09:00:00Z"
-    }
-  ]
-  ```
-
-- **Possible Errors**:
-  - `DatabaseError`: If there is an issue connecting to or querying the database.
+Lists all current reservations in a date range.
+- **Parameters**:
+  - `start_date`: str (required)
+  - `end_date`: str (required)
 
 ### GET /reservations/machines
 
 Lists all reservations for a specific machine.
 
-- **URL Parameters**:
+- **Parameters**:
   - `machine_name`: string (required)
-
-- **Example of Successful Response**:
-  ```json
-  [
-    {
-      "id": 1,
-      "customer_name": "Jane Smith",
-      "start_date": "2024-02-01T09:00:00Z",
-      "end_date": "2024-02-02T09:00:00Z"
-    }
-  ]
-  ```
-
-- **Possible Errors**:
-  - `MachineNotFoundError`: If no machine matches the given name.
-  - `DatabaseError`: If there is an issue connecting to or querying the database.
+  - `start_date`: str (required)
+  - `end_date`: str (required)
 
 ### GET /reservations/customers
 
 Lists all reservations for a specific customer.
 
-- **URL Parameters**:
+- **Parameters**:
   - `customer_name`: string (required)
-
-- **Example of Successful Response**:
-  ```json
-  [
-    {
-      "id": 3,
-      "machine_type": "harvester",
-      "start_date": "2024-03-01T09:00:00Z",
-      "end_date": "2024-03-02T09:00:00Z"
-    }
-  ]
-  ```
-
-- **Possible Errors**:
-  - `CustomerNotFoundError`: If no reservations exist for the specified customer.
-  - `DatabaseError`: If there is an issue connecting to or querying the database.
-
-
+  - `start_date`: str (required)
+  - `end_date`: str (required)
 
 ## Contributing
 
