@@ -1,6 +1,13 @@
 from fastapi import FastAPI, HTTPException, status, Query
 from modules import Reservation, ReservationCalendar, DateRange
 from datetime import datetime
+from pydantic import BaseModel
+
+class ReservationRequest(BaseModel):
+    customer_name: str
+    machine_name: str
+    start_date: str
+    end_date: str
 
 app = FastAPI()
 
@@ -11,20 +18,21 @@ calendar = ReservationCalendar()
 def root():
     return {"message": "Hello World"}
 
-@app.post("/reservations/")
-def add_reservation(customer_name: str, machine_name: str, start_date: str, end_date: str):
+@app.post("/reservations")
+def add_reservation(reservation_request: ReservationRequest):
     
     try:
-        reservation_date = DateRange(start_date, end_date)
-        reservation = Reservation(customer_name, machine_name, reservation_date)
+        reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
+        reservation = Reservation(reservation_request.customer_name, reservation_request.machine_name, reservation_date)
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
-
+    
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to add reservation due to {e}')
+                            detail=f'Failed to add reservation due to {e}')
 
-@app.get("/exit/")
+
+@app.get("/exit")
 def exit_handler(persist_status: bool = False):
     try:
         if persist_status is True:
@@ -102,4 +110,3 @@ def get_reservations_by_date(start: str = Query(None), end: str = Query(None)):
         # convert Reservation objects to dictionaries
         return {"reservations":[reservation.__dict__ for reservation in reservations]}
     return {"message":"No reservations found in this date range"}
-

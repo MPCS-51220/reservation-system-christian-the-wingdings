@@ -30,11 +30,11 @@ def make_reservation():
         end_date = input("\nEnter end date (YYYY-MM-DD HH:MM): ")
 
         data ={
-            "customer": customer_name,
-            "machine": machine,
+            "customer_name": customer_name,
+            "machine_name": machine,
             "start_date": start_date,
             "end_date": end_date
-        } # post request body
+        }
         
         response = requests.post(f"{BASE_URL}/reservations", json=data)
         if response.status_code == 201:
