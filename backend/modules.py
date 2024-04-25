@@ -84,6 +84,19 @@ class ReservationCalendar:
     '''
     def __init__(self):
         self.reservations = self.load_reservations()
+        self.load_test_data([
+                        {'start_date': '2024-04-29 10:00',
+                                'end_date': '2024-04-29 12:00',
+                                'customer_name': "Nikola",
+                                'machine_name': "scanner"
+                                },
+                        {'start_date': "2024-04-29 10:00",
+                                'end_date': "2024-04-29 12:00",
+                                'customer_name': "testcustomer",
+                                'machine_name': "scanner"
+                                }
+                                ])
+        
         
     def load_reservations(self):
         try:
@@ -94,6 +107,12 @@ class ReservationCalendar:
             calendar = {}
         return calendar
     
+    def load_test_data(self, data):
+        for data in data:
+            daterange = DateRange(data["start_date"], data["end_date"])
+            reservation = Reservation(data["customer_name"], data["machine_name"], daterange)
+            self.add_reservation(reservation, True)
+        
     def retrieve_by_date(self, daterange):
         final_reservations = []
     
@@ -126,10 +145,13 @@ class ReservationCalendar:
         
         return final_reservations
     
-    def add_reservation(self, reservation):
-        self._verify_business_hours(reservation)
-        self._check_equipment_availability(reservation)
-        self.reservations[reservation.id] = reservation
+    def add_reservation(self, reservation, is_test=False):
+        if not is_test:
+            self._verify_business_hours(reservation)
+            self._check_equipment_availability(reservation)
+            self.reservations[reservation.id] = reservation
+        else:
+            self.reservations[reservation.id] = reservation
     
     def remove_reservation(self, reservation_id):
         if reservation_id in self.reservations:
