@@ -23,7 +23,7 @@ class Reservation:
         calculate_refund(): Calculates the refund for a cancelled reservation
     '''
     def __init__(self, customer_name, machine_name, daterange):
-        self.id = uuid.uuid4()
+        self.id = str(uuid.uuid4())
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
