@@ -84,7 +84,9 @@ class ReservationCalendar:
     '''
     def __init__(self):
         self.reservations = self.load_reservations()
-        self.load_test_data([
+        
+        if not self.reservations:
+            self.load_test_data([
                         {'start_date': '2024-04-29 10:00',
                                 'end_date': '2024-04-29 12:00',
                                 'customer_name': "Nikola",
