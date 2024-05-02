@@ -1,7 +1,7 @@
 # T-01: API-ify the Reservation System
 
 ## Overview
-For this assignment, your team will work together to create an API-enabled version of the reservation system that we've already worked on.  You can rewrite code or borrow from any that you've already written or refactored.  You'll be using FastAPI, which allows you to write API applications fairly easily. We've discussed FastAPI in class and will continue to do so.  The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/661290
+For this assignment, your team will work together to improve last week's iteration.  The work in this iteration is focussed on making your design and tests more robust, implementing a robust (well, at least somewhat robust) persistence layer, and setting up user roles and passwords. The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663327
 
 
 # Equipment Reservation System Documentation
@@ -11,134 +11,131 @@ Welcome to the Equipment Reservation System! This system is designed to help use
 ## Table of Contents
 
 - [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-    - [Making a Reservation](#making-a-reservation)
-    - [Cancelling a Reservation](#cancelling-a-reservation)
-    - [Listing Reservations](#listing-reservations)
-    - [Exiting the System](#exiting-the-system)
-- [API Reference](#api-reference)
-    - [Post Reservation](#post-reservations)
-    - [Delete Reservation](#delete-reservations)
-    - [GET Reservations](#get-reservations)
-    - [GET Reservations By Machine](#get-reservations/machines)
-    - [GET Reservations By Customer](#get-reservations/customers)
-    <!-- - [Exiting the System](#exiting-the-system) -->
+    - [Installing SQLite](#installing-sqlite)
+- [New Features](#new-features)
+    - [Segregated Testing](#segregated-test)
+    - [Robust Error Handling](#error-handling)
+    - [Login System](#login-feature)
+- [Database System](#database-system)
+    - [Machine](#machine)
+    - [Reservation](#reservation)
+    - [User](#user)
+    - [Operation](#operation)
+    - [Table Connections](#table-connections)
 - [Contributing](#contributing)
 
 
 ## Installation
 
-Before you can run the Equipment Reservation System, you need to ensure that Python, FastAPI, Uvicorn, and the requests library are installed on your machine.
+Before you can run the Equipment Reservation System, you need to ensure that SQLite, Python, FastAPI, Uvicorn, and the requests library are installed on your machine.
 
-### Install Python and Libraries:
+### Installing SQLite:
 
-1. Download and install Python from [python.org](https://python.org).
-2. Ensure Python is added to your system's PATH.
-3. Install the required Python libraries using pip:
+Run the following command for Linux:
 
 ```bash
-pip install fastapi uvicorn requests
+sudo apt-get install sqlite3
 ```
 
-### Setup the Backend Server:
-
-Navigate to the backend directory and run the following command to start the server:
+MacOS has SQLite already installed, which can be accessed with
 
 ```bash
-uvicorn main:app --reload
+sqlite3
 ```
 
-### Setup the Frontend CLI:
+It is crucial for the system to have sqlite installed so data can be appropriately stored and used.
 
-Navigate to the frontend directory and run the `app.py` file:
+## New Features
 
-```bash
-python app.py
-```
+The Equipment Reservation System is accessed through a command-line interface. Below are new features added in this assignment.
 
-## Configuration
+### Segregated Test
 
-The system interacts with a backend server via API calls. Ensure the `BASE_URL` in the `app.py` file is set to the URL of the backend server you are using. For local development, this might be:
+Test data is stored in a separate pickle file so testing is separated from production data.
 
-```python
-BASE_URL = "http://localhost:8000"
-```
-
-## Usage
-
-The Equipment Reservation System is accessed through a command-line interface. Below are the commands and instructions on how to use them.
-
-### Making a Reservation
-
-    Select 'Make reservation' by entering 1 from the main menu.
-    Enter the required details:(Customer Name, Machine choice, Start Date and Time, End Date and Time)
-    The system will confirm upon success.
-*NOTE start/end is formated YYYY-MM-DD HH:MM*
-
-### Cancelling a Reservation
+### Error Handling
     
-    Select 'Cancel reservation' by entering 2 from the main menu.
-    Enter the ID of the reservation you wish to cancel.
-    The system will confirm the cancellation and show any applicable refund.
+We use try-catch along with resetting users to previous inputs in the case of bad user input and bad endpoints.
 
-### Listing Reservations
+### Login Feature
 
-    Select 'List reservations' by entering 3 from the main menu.
-    Choose the type of listing you need (by date, machine, or customer).
-    Enter the required parameters based on your selection.
+Upon starting the application, the user will be provided first with a login prompt where they enter credentials. If they provide a proper username and password combination, they are logged in as a user and given functionality depending on their role in the system. Customers have basic functionality for scheduling, cancelling, and viewing equiptment, but only for their own data. Schedulers have customer functionality for all data. Admin have total access to users and can change their roles.
 
-### Exiting the System
+## Database System
 
-    Select 'Quit' by entering 4 from the main menu.
-    Choose whether to save changes (if applicable).
-*NOTE: calendar object will be saved as calendar.pkl in the main repo directory*
+With the introduction of user data, we have adopted a relational database system to store user and machine data. Here is a breakdown of the tables in the system.
 
-## API Reference
+### Machine
 
-This section details the available endpoints within the Equipment Reservation System, examples of successful responses, and errors that might occur during each operation.
+Rows:
 
-### POST Reservations
+Machine_id (PK): unique id for the machine type
 
-Creates a new equipment reservation.
+Name: (scanner, scooper, harvester)
 
-- **Parameters**:
-  - `customer_name`: string (required)
-  - `machine_type`: string (required)
-  - `start_date`: datetime (required)
-  - `end_date`: datetime (required)
+quantity: number of machines of the type
 
-### DELETE Reservations
+cooldown: cooldown time in minutes
 
-Cancels an existing reservation.
+rate: rate per hour
 
-- **Parameters**:
-  - `reservation_id`: int (required)
 
-### GET /reservations
+### Reservation
 
-Lists all current reservations in a date range.
-- **Parameters**:
-  - `start_date`: str (required)
-  - `end_date`: str (required)
+Rows:
 
-### GET Reservations/Machines
+reservation_id (PK): unique reservation id
 
-Lists all reservations for a specific machine.
+customer: name of customer
 
-- **Parameters**:
-  - `machine_name`: string (required)
-  - `start_date`: str (required)
-  - `end_date`: str (required)
+machine_id (FK): id of machine type reserved
 
-### GET Reservations/Customers
+start_date: start date and time of reservation
 
-Lists all reservations for a specific customer.
+end_date: end date and time of reservation
 
-- **Parameters**:
-  - `customer_name`: string (required)
-  - `start_date`: str (required)
-  - `end_date`: str (required)
+total_cost: total cost of reservation
+
+down_payment: down payment for reservation
+
+
+### User
+
+Rows:
+
+user_id (PK): unique user id
+
+username: user’s name
+
+password_hash: hashed password
+
+role: (admin, customer, scheduler)
+
+salt: unique salt for password
+
+
+### Operation
+
+Rows:
+
+
+operation_id (PK): unique id for the operation
+
+user_id (FK): id of the user who performed the operation
+
+timestamp: timestamp of the operation
+
+type: type of the operation (cancellation, making reservation, listing reservations, adding users)
+
+description: description of the operation performed
+
+
+### Table Connections
+
+one-to-many connection from Machine to Reservation
+
+one-to-many connection from User to Operations
+
 
 ## Contributing
 
