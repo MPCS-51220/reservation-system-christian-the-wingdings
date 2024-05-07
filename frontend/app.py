@@ -1,7 +1,15 @@
 import requests
 import json
+from datetime import datetime
 
 BASE_URL = "http://localhost:8000"
+
+def validate_datetime(date):
+    try:
+        datetime.strptime(date, '%Y-%m-%d %H:%M')
+        return True
+    except ValueError:
+        return False
 
 def get_machine_choice():
     """
@@ -16,7 +24,7 @@ def get_machine_choice():
     elif choice == '3':
         machine = "harvester"
     else:
-        print("Invalid choice. Back to the main menu")
+        print("\nInvalid choice. Back to the main menu\n")
         return
     return machine
 
@@ -28,6 +36,10 @@ def make_reservation():
             return    
         start_date = input("\nEnter start date (YYYY-MM-DD HH:MM): ")
         end_date = input("\nEnter end date (YYYY-MM-DD HH:MM): ")
+
+        if not validate_datetime(start_date) or not validate_datetime(end_date):
+            print("\nInvalid date. Please use the specified format.\n")
+            return
 
         data ={
             "customer_name": customer_name,
@@ -41,9 +53,9 @@ def make_reservation():
             print("\nReservation added successfully")
         else:
             error_detail = response.json().get('detail', 'Unknown error occurred')
-            print(f"Error occurred while adding reservation: {error_detail}")
+            print(f"\nError occurred while adding reservation: {error_detail}")
     except Exception as e:
-        print(f"Error occurred while adding reservation: {str(e)}")
+        print(f"\nError occurred while adding reservation: {str(e)}")
 
 def cancel_reservation():
     try:
@@ -55,7 +67,7 @@ def cancel_reservation():
         else:
             print(response.json()['detail'])
     except Exception as e:
-        print("An error occurred ", str(e))
+        print("\nAn error occurred ", str(e))
 
 
 def list_reservations():
@@ -63,12 +75,18 @@ def list_reservations():
     print("2. List the reservations for a given machine for a given date range\n")
     print("3. List the reservations for a given customer for a given date range\n\n")
     choice = input("\nEnter your choice: ")
+    if choice not in ['1','2','3']:
+        print("\nInvalid choice. Return to the main menu\n")
+        return
     start_date = input("\nEnter start date (YYYY-MM-DD HH:MM)  :")
     end_date = input("\nEnter end date (YYYY-MM-DD HH:MM)  :")
+    if not validate_datetime(start_date) or not validate_datetime(end_date):
+        print("\nInvalid date. Please use the specified format.\n")
+        return
     params = {
         "start": start_date,
         "end": end_date
-    } # url paramaters
+    } # url parameters
 
     try: 
         if choice == '1':
@@ -85,7 +103,7 @@ def list_reservations():
             response = requests.get(f"{BASE_URL}/reservations/customers/{customer}", params=params)
 
         else:
-            print("Invalid choice. Back to the main menu")
+            print("\nInvalid choice. Back to the main menu\n")
             return
 
         if response.status_code == 200:
@@ -100,7 +118,7 @@ def list_reservations():
             print(response.json()['detail'])
 
     except Exception as e:
-        print("Error occurred in retrieving reservations ",str(e))
+        print("\nError occurred in retrieving reservations ",str(e))
 
 def exit_system():
     try:
@@ -116,7 +134,7 @@ def exit_system():
             print(response.json()['detail']) # printing HTTPException message
 
     except Exception as e:
-        print("Error while saving changes ",str(e))
+        print("\nError while saving changes ",str(e))
 
 def main():
     while True:
