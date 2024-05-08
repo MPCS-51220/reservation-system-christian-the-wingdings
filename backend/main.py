@@ -109,6 +109,33 @@ def get_reservations_by_machine(machine_name: str,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to get reservations due to {e}')
+    
+
+@app.get("/reservations/machines/{machine_name}/customers/{customer_name}", status_code=status.HTTP_200_OK)
+def get_reservations_by_machine(machine_name: str, 
+                                customer_name: str,
+                                  start: str = Query(..., description="Start date of the reservation period"),
+                                  end: str = Query(..., description="End date of the reservation period")):
+    """
+    This endpoint retrieves the reservations made for a machine
+    in a particular date range. It returns an appropriate message
+    if no such reservations are found.
+    """
+    try:
+        if start and end:
+            daterange = DateRange(start, end)
+            reservations = calendar.retrieve_by_machine_and_customer(daterange, machine_name, customer_name)
+        else:
+            raise HTTPException(status_code=400, detail="Both start and end dates are required")
+        
+        if reservations:
+            return {"reservations":[vars(reservation) for reservation in reservations]}
+        else:
+            return {"message": "No reservations found for this machine."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to get reservations due to {e}')
 
     
 @app.delete("/reservations/{reservation_id}", status_code=status.HTTP_200_OK)

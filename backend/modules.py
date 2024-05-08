@@ -145,6 +145,18 @@ class ReservationCalendar:
         
         return final_reservations
     
+    def retrieve_by_machine_and_customer(self, daterange, machine, customer):
+        final_reservations = []
+    
+        for reservation in self.reservations.values():
+            if (reservation.machine == machine and 
+                reservation.customer == customer and 
+                reservation.daterange.start_date <= daterange.end_date and 
+                reservation.daterange.end_date >= daterange.start_date):
+                final_reservations.append(reservation)
+        
+        return final_reservations
+    
     def add_reservation(self, reservation, is_test=False):
         if not is_test:
             self._verify_business_hours(reservation)
