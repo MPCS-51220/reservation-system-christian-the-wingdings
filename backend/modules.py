@@ -1,6 +1,7 @@
 import uuid
 import pickle
 from datetime import datetime, date
+import sqlite3
 
 class Reservation:
     '''
@@ -50,17 +51,16 @@ class Reservation:
         return self.cost * 0.5
 
 
-    def calculate_refund(self):
-        # calculate refund based on number of advance days of cancellation
-        advance_days = (self.daterange.start_date - datetime.now()).days
-        if advance_days >= 7:
-            refund = 0.75 * self.down_payment
-        elif advance_days >= 2:
-            refund = 0.5 * self.down_payment
-        else:
-            refund = 0
-        return refund
-
+def calculate_refund(start_date, down_payment):
+    # calculate refund based on number of advance days of cancellation
+    advance_days = (start_date - datetime.now()).days
+    if advance_days >= 7:
+        refund = 0.75 * down_payment
+    elif advance_days >= 2:
+        refund = 0.5 * down_payment
+    else:
+        refund = 0
+    return refund
 
 class ReservationCalendar:
     '''
@@ -81,102 +81,89 @@ class ReservationCalendar:
         save_reservations(): Saves current reservations to a data source.
     '''
     def __init__(self):
-        self.reservations = self.load_reservations()
-        
-        if not self.reservations:
-            self.load_test_data([
-                        {'start_date': '2024-04-29 10:00',
-                                'end_date': '2024-04-29 12:00',
-                                'customer_name': "Nikola",
-                                'machine_name': "scanner"
-                                },
-                        {'start_date': "2024-04-29 10:00",
-                                'end_date': "2024-04-29 12:00",
-                                'customer_name': "testcustomer",
-                                'machine_name': "scanner"
-                                }
-                                ])
-        
-        
-    def load_reservations(self):
-        try:
-            with open("../calendar.pkl", "rb") as f:
-                previous_calendar = pickle.load(f)
-                calendar = previous_calendar.reservations
-        except FileNotFoundError:
-            calendar = {}
-        return calendar
-    
-    def load_test_data(self, data):
-        for data in data:
-            daterange = DateRange(data["start_date"], data["end_date"])
-            reservation = Reservation(data["customer_name"], data["machine_name"], daterange)
-            self.add_reservation(reservation, True)
+       
+        self.conn = sqlite3.connect('../reservationDB.db')
+        self.conn.row_factory = sqlite3.Row
+        self.cursor = self.conn.cursor()
+
         
     def retrieve_by_date(self, daterange):
-        final_reservations = []
-    
-        for reservation in self.reservations.values():
-            if (reservation.daterange.start_date <= daterange.end_date and 
-                reservation.daterange.end_date >= daterange.start_date):
-                final_reservations.append(reservation)
 
-        return final_reservations
-    
-    def retrieve_by_machine(self, daterange, machine):
-        final_reservations = []
-    
-        for reservation in self.reservations.values():
-            if (reservation.machine == machine and 
-                reservation.daterange.start_date <= daterange.end_date and 
-                reservation.daterange.end_date >= daterange.start_date):
-                final_reservations.append(reservation)
+        start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+        end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
         
-        return final_reservations
+        query = "SELECT * FROM Reservation WHERE datetime(start_date) <= datetime(?) AND datetime(end_date) >= datetime(?)"
+        self.cursor.execute(query, (end, start))
+        rows = self.cursor.fetchall()
+        return [dict(row) for row in rows]        
+    
+     
+    def retrieve_by_machine(self, daterange, machine):
+
+        start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+        end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+        query = """
+        SELECT Reservation.* FROM Reservation
+        JOIN Machine ON Reservation.machine_id = Machine.machine_id
+        WHERE Machine.name = ?
+        AND datetime(Reservation.start_date) <= datetime(?)
+        AND datetime(Reservation.end_date) >= datetime(?)
+        """
+        
+        self.cursor.execute(query, (machine, end, start))
+        rows = self.cursor.fetchall()
+        return [dict(row) for row in rows]   
+        
     
     def retrieve_by_customer(self, daterange, customer):
-        final_reservations = []
-    
-        for reservation in self.reservations.values():
-            if (reservation.customer == customer and 
-                reservation.daterange.start_date <= daterange.end_date and 
-                reservation.daterange.end_date >= daterange.start_date):
-                final_reservations.append(reservation)
+        start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+        end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+        query = """
+        SELECT * FROM Reservation WHERE customer = ? 
+        AND datetime(start_date) <= datetime(?)
+        AND datetime(end_date) >= datetime(?)
+        """
         
-        return final_reservations
+        self.cursor.execute(query, (customer, end, start))
+        rows = self.cursor.fetchall()
+        return [dict(row) for row in rows] 
     
-    def add_reservation(self, reservation, is_test=False):
-        if not is_test:
-            self._verify_business_hours(reservation)
-            self._check_equipment_availability(reservation)
-            self.reservations[reservation.id] = reservation
-        else:
-            self.reservations[reservation.id] = reservation
+    
+    def add_reservation(self, reservation):
+        self._verify_business_hours(reservation)
+        self._check_equipment_availability(reservation)
+        self.cursor.execute("SELECT machine_id from Machine WHERE name = ?", (reservation.machine,))
+        machine_id = self.cursor.fetchone()
+        if not machine_id:
+            raise ValueError("Machine not found")
+
+        query = """
+        INSERT INTO Reservation (reservation_id, customer, machine_id, 
+        start_date, end_date, total_cost, down_payment) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        self.cursor.execute(query,(reservation.id, reservation.customer, machine_id[0],
+                                   reservation.daterange.start_date, reservation.daterange.end_date,
+                                   reservation.cost, reservation.down_payment))
+        self.conn.commit()
+        
+
     
     def remove_reservation(self, reservation_id):
-        if reservation_id in self.reservations:
-            reservation = self.reservations[reservation_id]
-            refund = reservation.calculate_refund()
-            del self.reservations[reservation_id]
+
+        query = "SELECT start_date, down_payment FROM Reservation WHERE reservation_id = ?"
+        self.cursor.execute(query, (reservation_id,))
+        row = self.cursor.fetchone()
+        if row:
+            start_date = row[0]
+            down_payment = row[1]
+            refund = calculate_refund(start_date, down_payment)
+            query = "DELETE FROM Reservation WHERE reservation_id = ?"
+            self.cursor.execute(query,(reservation_id,))
+            self.conn.commit()
             return refund
         return False
     
-    def save_reservations(self):
-        try:
-            with open("../calendar.pkl", "wb") as f:
-                pickle.dump(self, f)
-                
-        except (OSError, IOError) as e:
-            raise Exception(f'Error saving reservations to file.\n{e}')
-        
-        except pickle.PicklingError as e:
-            raise Exception(f'Error pickling reservations.\{e}')
-
-        except Exception as e:
-            raise Exception(f'An uncexpected error occurred saving reservations.\n{e}')
-        
-        else:
-            return 'success'
 
     def _verify_business_hours(self, reservation):
         # Check if the reservation is on a Sunday
@@ -202,6 +189,7 @@ class ReservationCalendar:
             raise ValueError("Reservations cannot be made more than 30 days in advance.")
         
     def _check_equipment_availability(self, reservation):
+
         overlapping_reservations = self.retrieve_by_date(reservation.daterange)
 
         # Count how many scanners, harvesters, and scoopers are reserved in the overlapping period
@@ -210,11 +198,11 @@ class ReservationCalendar:
         scooper_count = 0
 
         for res in overlapping_reservations:
-            if res.machine == "scanner":
+            if res['machine'] == "scanner":
                 scanner_count += 1
-            if res.machine == "harvester":
+            if res['machine'] == "harvester":
                 harvester_reserved = True
-            if res.machine == "scooper":
+            if res['machine'] == "scooper":
                 scooper_count += 1
 
         # Check constraints for scanners
@@ -228,6 +216,8 @@ class ReservationCalendar:
         if reservation.machine == "harvester":
             if scanner_count > 0:
                 raise ValueError("The harvester cannot operate while scanners are in use.")
+            if harvester_reserved:
+                raise ValueError("The harvester is already reserved for this time period.")
 
         # Check constraints for scoopers
         if reservation.machine == "scooper":
