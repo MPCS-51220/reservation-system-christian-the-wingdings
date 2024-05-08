@@ -8,7 +8,7 @@ from getpass import getpass
 BASE_URL = "http://localhost:8000"
 
 def connect_db():
-    return sqlite3.connect('system.db')
+    return sqlite3.connect('../reservationDB.db')
 
 def hash_password(password, salt):
     return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
@@ -17,12 +17,12 @@ def login():
     db = connect_db()
     #only for test next line
     #print(hash_password('temp', 'random_salt'))
-    username = input("Enter username: ")
+    login_username = input("Enter username: ")
     password = getpass("Enter password: ")
     
     try:
         cursor = db.cursor()
-        cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (username,))
+        cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
         user = cursor.fetchone()
         db.close()
         if user:
@@ -30,12 +30,13 @@ def login():
 
             if hashed_password == user[0] == '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215':
                 print("You currently are using a temp password and need to change it: ")
-                global role
+                global username, role
+                username = login_username
                 role = user[2]
                 change_user_password()
-                return username, user[2]
+                return login_username, user[2]
             elif hashed_password == user[0]:
-                return username, user[2]  # Return the role of the user
+                return login_username, user[2]  # Return the role of the user
             else:
                 print("Incorrect password")
         else:
@@ -50,20 +51,6 @@ def logout():
     username = None
     role = None
     print("Logged out successfully. Returning to login page.")
-
-''' def authenticated_session(func):
-    def wrapper(*args, **kwargs):
-        if 'role' not in globals():
-            global username, role
-            credentials = login()
-            if credentials:
-                username, role = credentials
-                return func(*args, **kwargs)
-            else:
-                print("Authentication failed. Please try again.")
-        else:
-            return func(*args, **kwargs)
-    return wrapper '''
 
 def get_machine_choice():
     """
@@ -82,7 +69,6 @@ def get_machine_choice():
         return
     return machine
 
-# @authenticated_session
 def make_reservation():
     if role not in ['admin', 'scheduler', 'customer']:
         print("You do not have permission to make reservations.")
@@ -117,7 +103,6 @@ def make_reservation():
     except Exception as e:
         print(f"Error occurred while adding reservation: {str(e)}")
 
-# @authenticated_session
 def cancel_reservation():
     if role not in ['admin', 'scheduler', 'customer']:
         print("You do not have permission to cancel reservations.")
@@ -150,7 +135,6 @@ def cancel_reservation():
     except Exception as e:
         print("An error occurred ", str(e))
 
-# @authenticated_session
 def list_reservations():
     if role not in ['admin', 'scheduler', 'customer']:
         print("You do not have permission to view reservations.")
@@ -179,9 +163,6 @@ def list_reservations():
                 response = requests.get(f"{BASE_URL}/reservations/machines/{machine}", params=params) # !!!! no functionality for only one customer
 
             elif choice == '3':
-                #if role == 'customer':
-                #    customer = username  # Customers can only make reservations for themselves
-                #else:
                 customer = input("\nEnter customer name: ")  # Schedulers can make reservations for anyone
                 response = requests.get(f"{BASE_URL}/reservations/customers/{customer}", params=params)
 
@@ -262,17 +243,13 @@ def exit_system():
 
 
 # admin management
-
-# @authenticated_session
 def add_user():
     if role != 'admin':
         print("Unauthorized access. Only admins can add users.")
         return
     
     username = input("Enter new username: ")
-    #temporary_password = input("Enter temporary password: ")
     user_role = input("Enter user role (customer, scheduler, admin): ")
-    #salt = os.urandom(32).hex()
     password_hash = hash_password('temp', 'random_salt')
     
     db = connect_db()
@@ -287,7 +264,6 @@ def add_user():
     finally:
         db.close()
 
-# @authenticated_session
 def remove_user():
     if role != 'admin':
         print("Unauthorized access. Only admins can remove users.")
@@ -314,7 +290,6 @@ def remove_user():
     finally:
         db.close()
 
-# @authenticated_session
 def change_user_role():
     if role != 'admin':
         print("Unauthorized access. Only admins can change user roles.")
@@ -345,37 +320,17 @@ def change_user_role():
 def change_user_password():
     db = connect_db()
     try:
-        '''current_password = getpass("Enter your current password: ")
-        cursor = db.cursor()
-        cursor.execute("SELECT password_hash, salt FROM User WHERE username = ?", (username,))
-        user = cursor.fetchone()
-        if user is None:
-            print("User not found.")
-            return
-        
-        # Verify the current password
-        hashed_password = hash_password(current_password, user[1])
-        if hashed_password != user[0]:
-            print("Incorrect password.")
-            return '''
         
         cursor = db.cursor()
 
         # Enter new password
         new_password = getpass("Enter your new password: ")
-        new_password_confirm = getpass("Confirm your new password: ")
-        if new_password != new_password_confirm:
-            print("Passwords do not match.")
-            return
-        #print(role)
+
         # Hash the new password
         new_salt = os.urandom(32).hex()  # Generate a new salt
         new_hashed_password = hash_password(new_password, new_salt)
         
-        if role == 'customer':
-            customer_name = username  # Customers can only make reservations for themselves
-        else:
-            customer_name = input("\nEnter customer name to change: ")  # Schedulers can make reservations for anyone
+        customer_name = username  # Customers can only make reservations for themselves
 
         # Update the password in the database
         cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
@@ -389,14 +344,35 @@ def change_user_password():
         db.close()
 
 
+def reset_password():
+    if role != 'admin':
+        print("Unauthorized access. Only admins can change user roles.")
+        return
+    
+    username_to_change = input("Enter username of the user to reset their password: ")
+    db = connect_db()
+    try:
+        cursor = db.cursor()
+
+        cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", (
+            '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215', 'random_salt', username_to_change))
+        db.commit()
+        print("Password reset successfully.")
+    except Exception as e:
+        print("Failed to reset password: ", str(e))
+    finally:
+        db.close()
+
+
+
 
 
 
 def show_menu_by_role(role):
     actions = {
-        'customer': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change Password", "5. Logout", "6. Exit"],
-        'scheduler': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change Password", "5. Logout", "6. Exit"],
-        'admin': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change Password", "5. Logout", "6. Exit", "7. Add user", "8. Remove user", "9. Change user role"]
+        'customer': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change My Password", "5. Logout", "6. Exit"],
+        'scheduler': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change My Password", "5. Logout", "6. Exit"],
+        'admin': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change My Password", "5. Logout", "6. Exit", "7. Add user", "8. Remove user", "9. Change user role", "10. Reset Password"]
     }
     if role in actions:
         return actions[role]
@@ -420,20 +396,11 @@ def main():
                 
                 choice = input("\nEnter your choice: ")
                 if choice == '1':
-                    #if role in ['customer', 'scheduler']:
                     make_reservation()
-                    #elif role == 'admin':
-                    #    add_user()
                 elif choice == '2':
-                    #if role in ['customer', 'scheduler']:
                     cancel_reservation()
-                    #elif role == 'admin':
-                    #    remove_user()
                 elif choice == '3':
-                    #if role in ['customer', 'scheduler']:
                     list_reservations()
-                    #elif role == 'admin':
-                    #    change_user_role()
                 elif choice == '4':
                     change_user_password()
                 elif choice == '5':
@@ -449,6 +416,8 @@ def main():
                     remove_user()
                 elif choice == '9' and role == 'admin':
                     change_user_role()
+                elif choice == '10' and role == 'admin':
+                    reset_password()
                 else:
                     print("Invalid choice, please try again")
         if break_outer:
