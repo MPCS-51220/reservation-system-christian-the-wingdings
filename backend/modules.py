@@ -1,5 +1,4 @@
 import uuid
-import pickle
 from datetime import datetime, date
 import sqlite3
 
@@ -53,6 +52,7 @@ class Reservation:
 
 def calculate_refund(start_date, down_payment):
     # calculate refund based on number of advance days of cancellation
+    start_date = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     advance_days = (start_date - datetime.now()).days
     if advance_days >= 7:
         refund = 0.75 * down_payment
@@ -80,89 +80,139 @@ class ReservationCalendar:
         remove_reservation(reservation_id): Removes a reservation from the calendar.
         save_reservations(): Saves current reservations to a data source.
     '''
-    def __init__(self):
-       
-        self.conn = sqlite3.connect('../reservationDB.db')
-        self.conn.row_factory = sqlite3.Row
-        self.cursor = self.conn.cursor()
 
+
+    def get_db(self):
+        """
+        Connect to database
+        """
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            return conn
+        except sqlite3.Error as e:
+            print("Error while connecting to database: ",str(e))
+            raise
         
     def retrieve_by_date(self, daterange):
 
-        start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
-        end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
-        
-        query = "SELECT * FROM Reservation WHERE datetime(start_date) <= datetime(?) AND datetime(end_date) >= datetime(?)"
-        self.cursor.execute(query, (end, start))
-        rows = self.cursor.fetchall()
-        return [dict(row) for row in rows]        
+        try:
+
+            start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            
+            query = "SELECT * FROM Reservation WHERE datetime(start_date) <= datetime(?) AND datetime(end_date) >= datetime(?)"
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute(query, (end, start))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]      
+
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
     
      
     def retrieve_by_machine(self, daterange, machine):
 
-        start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
-        end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
-        query = """
-        SELECT Reservation.* FROM Reservation
-        JOIN Machine ON Reservation.machine_id = Machine.machine_id
-        WHERE Machine.name = ?
-        AND datetime(Reservation.start_date) <= datetime(?)
-        AND datetime(Reservation.end_date) >= datetime(?)
-        """
+        try:
+
+            start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            query = """
+            SELECT Reservation.* FROM Reservation
+            JOIN Machine ON Reservation.machine_id = Machine.machine_id
+            WHERE Machine.name = ?
+            AND datetime(Reservation.start_date) <= datetime(?)
+            AND datetime(Reservation.end_date) >= datetime(?)
+            """ # join with Reservation and Machine table
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute(query, (machine, end, start))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]   
         
-        self.cursor.execute(query, (machine, end, start))
-        rows = self.cursor.fetchall()
-        return [dict(row) for row in rows]   
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
         
     
     def retrieve_by_customer(self, daterange, customer):
-        start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
-        end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
-        query = """
-        SELECT * FROM Reservation WHERE customer = ? 
-        AND datetime(start_date) <= datetime(?)
-        AND datetime(end_date) >= datetime(?)
-        """
+
+        try:
+            start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            query = """
+            SELECT * FROM Reservation WHERE customer = ? 
+            AND datetime(start_date) <= datetime(?)
+            AND datetime(end_date) >= datetime(?)
+            """
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute(query, (customer, end, start))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows] 
         
-        self.cursor.execute(query, (customer, end, start))
-        rows = self.cursor.fetchall()
-        return [dict(row) for row in rows] 
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
     
     
     def add_reservation(self, reservation):
         self._verify_business_hours(reservation)
         self._check_equipment_availability(reservation)
-        self.cursor.execute("SELECT machine_id from Machine WHERE name = ?", (reservation.machine,))
-        machine_id = self.cursor.fetchone()
-        if not machine_id:
-            raise ValueError("Machine not found")
 
-        query = """
-        INSERT INTO Reservation (reservation_id, customer, machine_id, 
-        start_date, end_date, total_cost, down_payment) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """
-        self.cursor.execute(query,(reservation.id, reservation.customer, machine_id[0],
-                                   reservation.daterange.start_date, reservation.daterange.end_date,
-                                   reservation.cost, reservation.down_payment))
-        self.conn.commit()
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            # get machine id
+            cursor.execute("SELECT machine_id from Machine WHERE name = ?", (reservation.machine,))
+            machine_id = cursor.fetchone()
+            if not machine_id:
+                raise ValueError("Machine not found")
+
+            query = """
+            INSERT INTO Reservation (reservation_id, customer, machine_id, 
+            start_date, end_date, total_cost, down_payment) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            cursor.execute(query,(reservation.id, reservation.customer, machine_id[0],
+                                    reservation.daterange.start_date, reservation.daterange.end_date,
+                                    reservation.cost, reservation.down_payment))
+            conn.commit()
+            conn.close()
+
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
         
 
     
     def remove_reservation(self, reservation_id):
 
-        query = "SELECT start_date, down_payment FROM Reservation WHERE reservation_id = ?"
-        self.cursor.execute(query, (reservation_id,))
-        row = self.cursor.fetchone()
-        if row:
-            start_date = row[0]
-            down_payment = row[1]
-            refund = calculate_refund(start_date, down_payment)
-            query = "DELETE FROM Reservation WHERE reservation_id = ?"
-            self.cursor.execute(query,(reservation_id,))
-            self.conn.commit()
-            return refund
-        return False
+        try:
+            query = "SELECT start_date, down_payment FROM Reservation WHERE reservation_id = ?"
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute(query, (reservation_id,))
+            row = cursor.fetchone()
+            if row: # check if reservation exists
+                start_date = row[0]
+                down_payment = row[1]
+                refund = calculate_refund(start_date, down_payment)
+                query = "DELETE FROM Reservation WHERE reservation_id = ?"
+                cursor.execute(query,(reservation_id,))
+                conn.commit()
+                return refund
+            return False
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
     
 
     def _verify_business_hours(self, reservation):
