@@ -22,36 +22,42 @@ def hash_password(password, salt):
     return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
 def login():
-    db = connect_db()
+    #db = connect_db()
     #only for test next line
     #print(hash_password('temp', 'random_salt'))
     login_username = input("Enter username: ")
     password = getpass("Enter password: ")
     
     try:
-        cursor = db.cursor()
-        cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
-        user = cursor.fetchone()
-        db.close()
+        #cursor = db.cursor()
+        #cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
+        #user = cursor.fetchone()
+        #db.close()
+        response = requests.get(f"{BASE_URL}/login/{login_username}")
+        user = None
+        if response.status_code == 200:
+            user_data = response.json()
+            if 'user' in user_data:
+                user = user_data['user']
         if user:
-            hashed_password = hash_password(password, user[1])
+            hashed_password = hash_password(password, user['salt'])
 
-            if hashed_password == user[0] == '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215':
+            if hashed_password == user['password_hash'] == '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215':
                 print("You currently are using a temp password and need to change it: ")
                 global username, role
                 username = login_username
-                role = user[2]
+                role = user['role']
                 change_user_password()
-                return login_username, user[2]
-            elif hashed_password == user[0]:
-                return login_username, user[2]  # Return the role of the user
+                return login_username, user['role']
+            elif hashed_password == user['password_hash']:
+                return login_username, user['role']  # Return the role of the user
             else:
                 print("Incorrect password")
         else:
             print("User not found")
     except Exception as e:
         print(f"Database error: {str(e)}")
-        db.close()
+        #db.close()
     return None, None
 
 def logout():
@@ -123,16 +129,23 @@ def cancel_reservation():
     try:
         reservation_id = input("\nEnter id of the reservation to cancel: ")
         if role == 'customer':
-            db = connect_db()
-            cursor = db.cursor()
+            #db = connect_db()
+            #cursor = db.cursor()
             if role == 'customer':
                 # Verify that the reservation belongs to the logged-in customer
-                cursor.execute("SELECT customer FROM Reservation WHERE reservation_id = ?", (reservation_id,))
-                reservation = cursor.fetchone()
+                #cursor.execute("SELECT customer FROM Reservation WHERE reservation_id = ?", (reservation_id,))
+                #reservation = cursor.fetchone()
+                
+                response = requests.get(f"{BASE_URL}/reservations/id/{reservation_id}")
+                reservation = None
+                if response.status_code == 200:
+                    reserv_data = response.json()
+                    if 'reserv' in reserv_data:
+                        reservation = reserv_data['reserv']
                 if reservation is None:
                     print("Reservation not found.")
                     return
-                elif reservation[0] != username: # assume customer in reservation is username of user
+                elif reservation['customer'] != username: # assume customer in reservation is username of user
                     print("You can only cancel your own reservations.")
                     return
 
@@ -245,18 +258,32 @@ def add_user():
     username = input("Enter new username: ")
     user_role = input("Enter user role (customer, scheduler, admin): ")
     password_hash = hash_password('temp', 'random_salt')
+
+    data ={
+            "username": username,
+            "password_hash": password_hash,
+            "salt": 'random_salt',
+            "role": user_role
+        }
+        
+    response = requests.post(f"{BASE_URL}/users", json=data)
+    if response.status_code == 201:
+        print("\nUser added successfully")
+    else:
+        error_detail = response.json().get('detail', 'Unknown error occurred')
+        print(f"\nError occurred while adding user: {error_detail}")
     
-    db = connect_db()
-    try:
-        cursor = db.cursor()
-        cursor.execute("INSERT INTO User (username, password_hash, salt, role) VALUES (?, ?, ?, ?)", 
-                       (username, password_hash, 'random_salt', user_role))
-        db.commit()
-        print("User added successfully with a temporary password.")
-    except Exception as e:
-        print("Failed to add user: ", str(e))
-    finally:
-        db.close()
+    #db = connect_db()
+    #try:
+        #cursor = db.cursor()
+        #cursor.execute("INSERT INTO User (username, password_hash, salt, role) VALUES (?, ?, ?, ?)", 
+                      #(username, password_hash, 'random_salt', user_role))
+        #db.commit()
+        #print("User added successfully with a temporary password.")
+    #except Exception as e:
+    #    print("Failed to add user: ", str(e))
+    #finally:
+    #    db.close()
 
 def remove_user():
     if role != 'admin':
@@ -264,25 +291,35 @@ def remove_user():
         return
     
     username_to_remove = input("Enter username of the user to remove: ")
-    db = connect_db()
+    #db = connect_db()
     try:
-        cursor = db.cursor()
+        #cursor = db.cursor()
         # Prevent admin from removing the last admin
-        cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
-        count = cursor.fetchone()[0]
-        cursor.execute("SELECT role FROM User WHERE username = ?", (username_to_remove,))
-        user_role = cursor.fetchone()[0]
+        #cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
+        #count = cursor.fetchone()[0]
+        #cursor.execute("SELECT role FROM User WHERE username = ?", (username_to_remove,))
+        #user_role = cursor.fetchone()[0]
+        response = requests.get(f"{BASE_URL}/users/admincheck/{username_to_remove}")
+        count, user_role = None, None
+        if response.status_code == 200:
+            data = response.json()
+            count =  data['count']
+            user_role =  data['user_role']
+        if count is None or user_role is None:
+            print("admincheck unsuccessful.")
+            return
         if count <= 1 and user_role == 'admin':
             print("Cannot remove the last admin.")
             return
         
-        cursor.execute("DELETE FROM User WHERE username = ?", (username_to_remove,))
-        db.commit()
+        response = requests.delete(f"{BASE_URL}/users/{username_to_remove}")
+        #cursor.execute("DELETE FROM User WHERE username = ?", (username_to_remove,))
+        #db.commit()
         print("User removed successfully.")
     except Exception as e:
         print("Failed to remove user: ", str(e))
-    finally:
-        db.close()
+    #finally:
+    #    db.close()
 
 def change_user_role():
     if role != 'admin':
@@ -291,31 +328,41 @@ def change_user_role():
     
     username_to_change = input("Enter username of the user to change role: ")
     new_role = input("Enter new role (customer, scheduler, admin): ")
-    db = connect_db()
+    #db = connect_db()
     try:
-        cursor = db.cursor()
+        #cursor = db.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
-        count = cursor.fetchone()[0]
-        cursor.execute("SELECT role FROM User WHERE username = ?", (username_to_change,))
-        user_role = cursor.fetchone()[0]
+        #cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
+        #count = cursor.fetchone()[0]
+        #cursor.execute("SELECT role FROM User WHERE username = ?", (username_to_change,))
+        #user_role = cursor.fetchone()[0]
+        response = requests.get(f"{BASE_URL}/users/admincheck/{username_to_change}")
+        count, user_role = None, None
+        if response.status_code == 200:
+            data = response.json()
+            count =  data['count']
+            user_role =  data['user_role']
+        if count is None or user_role is None:
+            print("admincheck unsuccessful.")
+            return
         if count <= 1 and user_role == 'admin':
             print("Cannot change role of the last admin.")
             return
 
-        cursor.execute("UPDATE User SET role = ? WHERE username = ?", (new_role, username_to_change))
-        db.commit()
+        response = requests.patch(f"{BASE_URL}/users/{username_to_change}/roles/{new_role}")
+        #cursor.execute("UPDATE User SET role = ? WHERE username = ?", (new_role, username_to_change))
+        #db.commit()
         print("User role updated successfully.")
     except Exception as e:
         print("Failed to change user role: ", str(e))
-    finally:
-        db.close()
+    #finally:
+    #    db.close()
 
 def change_user_password():
-    db = connect_db()
+    #db = connect_db()
     try:
         
-        cursor = db.cursor()
+        #cursor = db.cursor()
 
         # Enter new password
         new_password = getpass("Enter your new password: ")
@@ -326,16 +373,24 @@ def change_user_password():
         
         customer_name = username  # Customers can only make reservations for themselves
 
+        data ={
+            "username": customer_name,
+            "password_hash": new_hashed_password,
+            "salt": new_salt,
+            "role": role
+        }
+
         # Update the password in the database
-        cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
-                       (new_hashed_password, new_salt, customer_name))
-        db.commit()
+        response = requests.patch(f"{BASE_URL}/password/update", json=data)
+        #cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
+                       #(new_hashed_password, new_salt, customer_name))
+        #db.commit()
         print("Password changed successfully.")
         
     except Exception as e:
         print(f"Error while changing password: {str(e)}")
-    finally:
-        db.close()
+    #finally:
+    #    db.close()
 
 
 def reset_password():
@@ -344,18 +399,27 @@ def reset_password():
         return
     
     username_to_change = input("Enter username of the user to reset their password: ")
-    db = connect_db()
+    #db = connect_db()
     try:
-        cursor = db.cursor()
+        #cursor = db.cursor()
 
-        cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", (
-            '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215', 'random_salt', username_to_change))
-        db.commit()
+        data ={
+            "username": username_to_change,
+            "password_hash": '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215',
+            "salt": 'random_salt',
+            "role": role
+        }
+
+        # Update the password in the database
+        response = requests.patch(f"{BASE_URL}/password/update", json=data)
+        #cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", (
+            #'4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215', 'random_salt', username_to_change))
+        #db.commit()
         print("Password reset successfully.")
     except Exception as e:
         print("Failed to reset password: ", str(e))
-    finally:
-        db.close()
+    #finally:
+    #    db.close()
 
 
 
