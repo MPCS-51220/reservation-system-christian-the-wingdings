@@ -120,22 +120,6 @@ def list_reservations():
     except Exception as e:
         print("\nError occurred in retrieving reservations ",str(e))
 
-def exit_system():
-    try:
-        choice = input("\nDo you want to save your changes? Y/N:   ")
-        if choice.lower() == 'y':
-            params={'persist_status':True}
-        else:
-            params={'persist_status':False}
-        response = requests.get(f"{BASE_URL}/exit",params=params)
-        if response.status_code == 200:
-            print(response.json()['message']) # success message
-        else:
-            print(response.json()['detail']) # printing HTTPException message
-
-    except Exception as e:
-        print("\nError while saving changes ",str(e))
-
 def main():
     while True:
         print("\nWelcome to the Reservation System!\n")
@@ -148,7 +132,6 @@ def main():
         elif choice == '3':
             list_reservations()
         elif choice == '4':
-            exit_system()
             break
         else:
             print("Invalid choice, please try again")
