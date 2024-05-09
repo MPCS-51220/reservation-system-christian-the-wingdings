@@ -161,6 +161,33 @@ class ReservationCalendar:
             print("Database error: ",str(e))
             raise
     
+    def retrieve_by_machine_and_customer(self, daterange, machine, customer):
+        final_reservations = []
+    
+        for reservation in self.reservations.values():
+            if (reservation.machine == machine and 
+                reservation.customer == customer and 
+                reservation.daterange.start_date <= daterange.end_date and 
+                reservation.daterange.end_date >= daterange.start_date):
+                final_reservations.append(reservation)
+        
+        return final_reservations
+    
+    def add_reservation(self, reservation, is_test=False):
+        if not is_test:
+            self._verify_business_hours(reservation)
+            self._check_equipment_availability(reservation)
+            self.reservations[reservation.id] = reservation
+        else:
+            self.reservations[reservation.id] = reservation
+    
+    def remove_reservation(self, reservation_id):
+        if reservation_id in self.reservations:
+            reservation = self.reservations[reservation_id]
+            refund = reservation.calculate_refund()
+            del self.reservations[reservation_id]
+            return refund
+        return False
     
     def add_reservation(self, reservation):
         self._verify_business_hours(reservation)
