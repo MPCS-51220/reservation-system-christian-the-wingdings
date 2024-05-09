@@ -4,8 +4,16 @@ import hashlib
 import os
 import sqlite3
 from getpass import getpass
+from datetime import datetime
 
 BASE_URL = "http://localhost:8000"
+
+def validate_datetime(date):
+    try:
+        datetime.strptime(date, '%Y-%m-%d %H:%M')
+        return True
+    except ValueError:
+        return False
 
 def connect_db():
     return sqlite3.connect('../reservationDB.db')
@@ -65,7 +73,7 @@ def get_machine_choice():
     elif choice == '3':
         machine = "harvester"
     else:
-        print("Invalid choice. Back to the main menu")
+        print("\nInvalid choice. Back to the main menu\n")
         return
     return machine
 
@@ -87,7 +95,11 @@ def make_reservation():
         start_date = input("\nEnter start date (YYYY-MM-DD HH:MM): ")
         end_date = input("\nEnter end date (YYYY-MM-DD HH:MM): ")
 
-        data = {
+        if not validate_datetime(start_date) or not validate_datetime(end_date):
+            print("\nInvalid date. Please use the specified format.\n")
+            return
+
+        data ={
             "customer_name": customer_name,
             "machine_name": machine,
             "start_date": start_date,
@@ -99,9 +111,9 @@ def make_reservation():
             print("\nReservation added successfully")
         else:
             error_detail = response.json().get('detail', 'Unknown error occurred')
-            print(f"Error occurred while adding reservation: {error_detail}")
+            print(f"\nError occurred while adding reservation: {error_detail}")
     except Exception as e:
-        print(f"Error occurred while adding reservation: {str(e)}")
+        print(f"\nError occurred while adding reservation: {str(e)}")
 
 def cancel_reservation():
     if role not in ['admin', 'scheduler', 'customer']:
@@ -133,7 +145,7 @@ def cancel_reservation():
         else:
             print(response.json()['detail'])
     except Exception as e:
-        print("An error occurred ", str(e))
+        print("\nAn error occurred ", str(e))
 
 def list_reservations():
     if role not in ['admin', 'scheduler', 'customer']:
@@ -223,24 +235,6 @@ def list_reservations():
 
         except Exception as e:
             print("Error occurred in retrieving reservations ", str(e))
-
-
-def exit_system():
-    try:
-        choice = input("\nDo you want to save your changes? Y/N:   ")
-        if choice.lower() == 'y':
-            params={'persist_status':True}
-        else:
-            params={'persist_status':False}
-        response = requests.get(f"{BASE_URL}/exit",params=params)
-        if response.status_code == 200:
-            print(response.json()['message']) # success message
-        else:
-            print(response.json()['detail']) # printing HTTPException message
-
-    except Exception as e:
-        print("Error while saving changes ",str(e))
-
 
 # admin management
 def add_user():
@@ -407,7 +401,6 @@ def main():
                     logout()
                     break
                 elif choice == '6':
-                    exit_system()
                     break_outer = True
                     break
                 elif choice == '7' and role == 'admin':
