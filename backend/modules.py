@@ -2,9 +2,9 @@ import uuid
 from datetime import datetime, date
 import sqlite3
 import hashlib
-from passlib.context import CryptContext
+#from passlib.context import CryptContext
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+#pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserManager:
     ''' A class to manage user authentication and authorization.'''
