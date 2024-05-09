@@ -29,48 +29,49 @@ calendar = ReservationCalendar()
 def root():
     return {"message": "Hello World"}
 
-@app.post("/add_user/")
-async def add_user(username: str, password: str, role: str, salt: str, user_manager: UserManager = Depends()):
+#@app.post("/add_user/")
+#async def add_user(username: str, password: str, role: str, salt: str, user_manager: UserManager = Depends()):
+#    try:
+#        user_manager.add_user(username, password, role, salt)
+#        return {"message": "User added successfully"}
+#    except Exception as e:
+#        raise HTTPException(status_code=400, detail=str(e))
+
+
+#@app.post("/login/")
+#async def login_for_access_token(username, password, user_manager: UserManager = Depends(UserManager)):
+#    user = user_manager.authenticate_user(username, password)
+#    if not user:
+#        raise HTTPException(status_code=401, detail="Incorrect username or password")
+#    access_token = create_access_token(data={"sub": user['username'], "role": user['role']})
+#    return {"access_token": access_token, "token_type": "bearer"}
+
+#def get_current_user(token: str = Depends(oauth2_scheme)):
+#    credentials_exception = HTTPException(
+#        status_code=status.HTTP_401_UNAUTHORIZED,
+#        detail="Could not validate credentials",
+#        headers={"WWW-Authenticate": "Bearer"},
+#    )
+#    return decode_access_token(token) or credentials_exception
+
+@app.get("/login/{username}", status_code=status.HTTP_200_OK)
+def login(username: str):
+    user = calendar.login(username)
+    return {"user":user}
+
+@app.get("/users/admincheck/{username}", status_code=status.HTTP_200_OK)
+def get_admins(username: str):
+    count, user_role = calendar.retrieve_admin_check(username)
+    return {"count":count, "user_role": user_role}
+
+@app.post("/users", status_code=status.HTTP_201_CREATED)
+def add_user(user_request: UserRequest):
     try:
-        user_manager.add_user(username, password, role, salt)
-        return {"message": "User added successfully"}
+        calendar.add_user(user_request.username, user_request.password_hash, user_request.salt, user_request.role)
+        return {"message": "User added successfully!"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/login/")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), user_manager: UserManager = Depends(UserManager)):
-    user = user_manager.authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    access_token = create_access_token(data={"sub": user['username'], "role": user['role']})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    return decode_access_token(token) or credentials_exception
-# @app.get("/login/{username}", status_code=status.HTTP_200_OK)
-# def login(username: str):
-#     user = calendar.login(username)
-#     return {"user":user}
-
-# @app.get("/users/admincheck/{username}", status_code=status.HTTP_200_OK)
-# def get_admins(username: str):
-#     count, user_role = calendar.retrieve_admin_check(username)
-#     return {"count":count, "user_role": user_role}
-
-# @app.post("/users", status_code=status.HTTP_201_CREATED)
-# def add_user(user_request: UserRequest):
-#     try:
-#         calendar.add_user(user_request.username, user_request.password_hash, user_request.salt, user_request.role)
-#         return {"message": "User added successfully!"}
-#     except Exception as e:
-#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                             detail=f'Failed to add reservation due to {e}')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f'Failed to add reservation due to {e}')
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
 def add_reservation(reservation_request: ReservationRequest):
@@ -108,7 +109,7 @@ get_reservation_permissions = {
 }
 
 @app.get("/reservations/customers/{customer_name}", status_code=status.HTTP_200_OK)
-@role_required(get_reservation_permissions)
+#@role_required(get_reservation_permissions)
 def get_reservations_by_customer(customer_name: str, 
                                   start: str = Query(..., description="Start date of the reservation period"),
                                   end: str = Query(..., description="End date of the reservation period")):
