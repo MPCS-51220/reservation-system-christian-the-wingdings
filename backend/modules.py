@@ -1,6 +1,57 @@
 import uuid
 from datetime import datetime, date
 import sqlite3
+import hashlib
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class UserManager:
+    ''' A class to manage user authentication and authorization.'''
+    
+    def __init__(self):
+        self.db_path = '../reservationDB.db'
+
+    def add_user(self, username, password, role, salt):
+        
+        password_hash = self.hash_password(password, salt)  
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO User (username, password_hash, role, salt) VALUES (?, ?, ?, ?)", (username, password_hash, role, salt))
+            conn.commit()
+
+    def hash_password(self, password, salt):
+        print("Type of password:", type(password))
+        print("Type of salt:", type(salt))
+        return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+
+    def get_user(self, username):
+        """Retrieve user details from the database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, password_hash, role, salt FROM User WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {"username": row[0], "password_hash": row[1], "role": row[2], "salt": row[3]}
+        return None
+
+    def verify_password(self, plain_password, password_hash, salt):
+        """Verify a plaintext password against the hashed version."""
+        if password_hash == self.hash_password(plain_password, salt):
+            return True
+        else:
+            return False
+        # return pwd_context.verify(plain_password, password_hash)
+
+    def authenticate_user(self, username: str, password: str):
+        """Authenticate a user using username and password."""
+        user = self.get_user(username)
+        if user and self.verify_password(password, user['password_hash'], user['salt']):
+            return user
+        return False
+
+
 
 class Reservation:
     '''
