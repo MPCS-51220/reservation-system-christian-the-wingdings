@@ -131,30 +131,9 @@ pytest
 
 ## Passwords for Sample Users
 
-When loading the database from our repository, there starts some example users in the reservationDB. They are listed below:
- 
-List of users and passwords:
+When loading the database from our repository, there starts some example in the tables of reservationDB. 
 
-
-username: akshatha
-
-password: akshatha
-
-role: admin
-
-
-username: graham
-
-password: graham
-
-role: scheduler
-
-
-username: Adam
-
-password: Adam
-
-role: customer
+For the user, there is a user with username 'johndoe' and password 'hashed_password_example'. It is an admin user, so it can used to create new users for additional testing.
 
 
  Note: When a password is reset or a new user is created, their temporary password is set to 'temp'. When a user with this password tries to login, they will be prompted to change their password from 'temp', as that password is deemed unsecure with a specific salt I set in the system.
@@ -162,6 +141,8 @@ role: customer
 ## T-02 Security Discussion
 
 Our implementation has some security assumptions. We pass hashes between the backend and frontend pretty easily, and it definitely is not the most secure method. The front end and server are not encrypted, but we are assuming that it would be in a more fleshed-out implementation. Additionally, the role is a pretty easy variable to set in the code, and there is no protection to make sure it does not change (unless an admin changes it). This can be problematic because there are definitely ways to exploit our global variables in a way to give users too much permission.
+
+Lastly, we were working on but did not fully complete a version with tokens for extra security on the user. Currently, we trust that when a user logs in that they are who they say they are when working with the backend. We do think there are additional security measures we could use.
 
 
 ## New Features
