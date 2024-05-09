@@ -9,6 +9,12 @@ class ReservationRequest(BaseModel):
     start_date: str
     end_date: str
 
+class UserRequest(BaseModel):
+    username: str
+    password_hash: str
+    salt: str
+    role: str
+
 app = FastAPI() 
 
 # Create a new instance of ReservationCalendar
@@ -17,6 +23,25 @@ calendar = ReservationCalendar()
 @app.get("/")
 def root():
     return {"message": "Hello World"}
+
+@app.get("/login/{username}", status_code=status.HTTP_200_OK)
+def login(username: str):
+    user = calendar.login(username)
+    return {"user":user}
+
+@app.get("/users/admincheck/{username}", status_code=status.HTTP_200_OK)
+def get_admins(username: str):
+    count, user_role = calendar.retrieve_admin_check(username)
+    return {"count":count, "user_role": user_role}
+
+@app.post("/users", status_code=status.HTTP_201_CREATED)
+def add_user(user_request: UserRequest):
+    try:
+        calendar.add_user(user_request.username, user_request.password_hash, user_request.salt, user_request.role)
+        return {"message": "User added successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f'Failed to add reservation due to {e}')
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
 def add_reservation(reservation_request: ReservationRequest):
@@ -37,7 +62,10 @@ def add_reservation(reservation_request: ReservationRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
-
+@app.get("/reservations/id/{reservation_id}", status_code=status.HTTP_200_OK)
+def login(reservation_id: str):
+    reserv = calendar.retrieve_by_id(reservation_id)
+    return {"reserv":reserv}
 
 @app.get("/reservations/customers/{customer_name}", status_code=status.HTTP_200_OK)
 def get_reservations_by_customer(customer_name: str, 
@@ -130,6 +158,32 @@ def cancel_reservation(reservation_id: str):
             return {"message": "Reservation cancelled successfully", "refund": refund}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                     detail="Reservation not found") 
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to cancel reservation due to {e}')
+    
+
+@app.delete("/users/{username}", status_code=status.HTTP_200_OK)
+def remove_user(username: str):
+    try:
+        calendar.remove_user(username)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to cancel reservation due to {e}')
+    
+
+@app.patch("/users/{username}/roles/{role}", status_code=status.HTTP_200_OK)
+def update_user_role(role: str, username: str):
+    try:
+        calendar.update_user_role(role, username)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to cancel reservation due to {e}')
+    
+@app.patch("/password/update", status_code=status.HTTP_200_OK)
+def update_user_role(user_request: UserRequest):
+    try:
+        calendar.update_user_password(user_request.password_hash, user_request.salt, user_request.username)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
