@@ -162,32 +162,29 @@ class ReservationCalendar:
             raise
     
     def retrieve_by_machine_and_customer(self, daterange, machine, customer):
-        final_reservations = []
-    
-        for reservation in self.reservations.values():
-            if (reservation.machine == machine and 
-                reservation.customer == customer and 
-                reservation.daterange.start_date <= daterange.end_date and 
-                reservation.daterange.end_date >= daterange.start_date):
-                final_reservations.append(reservation)
+        try:
+
+            start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            query = """
+            SELECT Reservation.* FROM Reservation
+            JOIN Machine ON Reservation.machine_id = Machine.machine_id
+            WHERE Machine.name = ?
+            AND Reservation.customer = ?
+            AND datetime(Reservation.start_date) <= datetime(?)
+            AND datetime(Reservation.end_date) >= datetime(?)
+            """ # join with Reservation and Machine table
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute(query, (machine, customer, end, start))
+            rows = cursor.fetchall()
+            conn.close()
+            return [dict(row) for row in rows]   
         
-        return final_reservations
-    
-    def add_reservation(self, reservation, is_test=False):
-        if not is_test:
-            self._verify_business_hours(reservation)
-            self._check_equipment_availability(reservation)
-            self.reservations[reservation.id] = reservation
-        else:
-            self.reservations[reservation.id] = reservation
-    
-    def remove_reservation(self, reservation_id):
-        if reservation_id in self.reservations:
-            reservation = self.reservations[reservation_id]
-            refund = reservation.calculate_refund()
-            del self.reservations[reservation_id]
-            return refund
-        return False
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
     
     def add_reservation(self, reservation):
         self._verify_business_hours(reservation)

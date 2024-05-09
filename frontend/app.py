@@ -8,6 +8,28 @@ from datetime import datetime
 
 BASE_URL = "http://localhost:8000"
 
+def log_operation(type, description, timestamp):
+    """ 
+    Logs user operations to the database 
+    """
+    try:
+        global username  # Access the global username variable
+        timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        with sqlite3.connect('../reservationDB.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM USER WHERE username = ?",(username,))
+            user_id = cursor.fetchone()[0]
+            query = """
+                    INSERT INTO Operation (user_id, type, description, timestamp)
+                    VALUES (?, ?, ?, ?)
+                    """
+            cursor.execute(query, (user_id, type, description, timestamp))
+            conn.commit()
+
+    except sqlite3.Error as e:
+        print("Failed to log operation: ", str(e))
+
+
 def validate_datetime(date):
     try:
         datetime.strptime(date, '%Y-%m-%d %H:%M')
@@ -48,7 +70,7 @@ def login():
             else:
                 print("Incorrect password")
         else:
-            print("User not found")
+            print("\nUser not found")
     except Exception as e:
         print(f"Database error: {str(e)}")
         db.close()
@@ -56,6 +78,7 @@ def login():
 
 def logout():
     global username, role
+    log_operation("Logout", f"{username} logged out", datetime.now())
     username = None
     role = None
     print("Logged out successfully. Returning to login page.")
@@ -108,7 +131,9 @@ def make_reservation():
         
         response = requests.post(f"{BASE_URL}/reservations", json=data)
         if response.status_code == 201:
-            print("\nReservation added successfully")
+            print("\nReservation added successfully\n")
+            log_operation("Make reservation", f"Reservation made for machine {machine}", datetime.now())
+
         else:
             error_detail = response.json().get('detail', 'Unknown error occurred')
             print(f"\nError occurred while adding reservation: {error_detail}")
@@ -142,6 +167,7 @@ def cancel_reservation():
         if response.status_code == 200:
             refund = response.json()['refund']
             print("\nReservation cancelled successfully\nRefund amount: ", refund)
+            log_operation("Cancellation", f"Reservation {reservation_id} cancelled", datetime.now())
         else:
             print(response.json()['detail'])
     except Exception as e:
@@ -189,6 +215,10 @@ def list_reservations():
                     print(json.dumps(data, indent=2))
                 else: # no reservations found
                     print(response.json()['message'])
+                log_operation(
+                    "List reservations", 
+                    f"Listed reservations from {start_date} to {end_date}""", 
+                    datetime.now())
 
             else:
                 print(response.json()['detail'])
@@ -229,6 +259,9 @@ def list_reservations():
                     print(json.dumps(data, indent=2))
                 else: # no reservations found
                     print(response.json()['message'])
+                log_operation("List reservations", 
+                              f"Listed reservations from {start_date} to {end_date}", 
+                              datetime.now())
 
             else:
                 print(response.json()['detail'])
@@ -253,6 +286,7 @@ def add_user():
                        (username, password_hash, 'random_salt', user_role))
         db.commit()
         print("User added successfully with a temporary password.")
+        log_operation("Add user", f"New user added: {username}", datetime.now())
     except Exception as e:
         print("Failed to add user: ", str(e))
     finally:
@@ -260,10 +294,10 @@ def add_user():
 
 def remove_user():
     if role != 'admin':
-        print("Unauthorized access. Only admins can remove users.")
+        print("\nUnauthorized access. Only admins can remove users.")
         return
     
-    username_to_remove = input("Enter username of the user to remove: ")
+    username_to_remove = input("\nEnter username of the user to remove: ")
     db = connect_db()
     try:
         cursor = db.cursor()
@@ -279,6 +313,7 @@ def remove_user():
         cursor.execute("DELETE FROM User WHERE username = ?", (username_to_remove,))
         db.commit()
         print("User removed successfully.")
+        log_operation("Remove user", f"{username_to_remove} user removed", datetime.now())
     except Exception as e:
         print("Failed to remove user: ", str(e))
     finally:
@@ -289,8 +324,8 @@ def change_user_role():
         print("Unauthorized access. Only admins can change user roles.")
         return
     
-    username_to_change = input("Enter username of the user to change role: ")
-    new_role = input("Enter new role (customer, scheduler, admin): ")
+    username_to_change = input("\nEnter username of the user to change role: ")
+    new_role = input("\nEnter new role (customer, scheduler, admin): ")
     db = connect_db()
     try:
         cursor = db.cursor()
@@ -306,6 +341,7 @@ def change_user_role():
         cursor.execute("UPDATE User SET role = ? WHERE username = ?", (new_role, username_to_change))
         db.commit()
         print("User role updated successfully.")
+        log_operation("Change user role", f"{username_to_change} role changed to {new_role}", datetime.now())
     except Exception as e:
         print("Failed to change user role: ", str(e))
     finally:
@@ -331,6 +367,7 @@ def change_user_password():
                        (new_hashed_password, new_salt, customer_name))
         db.commit()
         print("Password changed successfully.")
+        log_operation("Change password", f"Password changed for user {username}", datetime.now())
         
     except Exception as e:
         print(f"Error while changing password: {str(e)}")
@@ -343,7 +380,7 @@ def reset_password():
         print("Unauthorized access. Only admins can change user roles.")
         return
     
-    username_to_change = input("Enter username of the user to reset their password: ")
+    username_to_change = input("\nEnter username of the user to reset their password: ")
     db = connect_db()
     try:
         cursor = db.cursor()
@@ -352,6 +389,7 @@ def reset_password():
             '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215', 'random_salt', username_to_change))
         db.commit()
         print("Password reset successfully.")
+        log_operation("Reset password", f"Password reset for user {username_to_change}", datetime.now())
     except Exception as e:
         print("Failed to reset password: ", str(e))
     finally:
@@ -380,6 +418,7 @@ def main():
         print("\n")
         break_outer = False
         if username is not None:
+            log_operation("Login", f"{username} logged in", datetime.now())
             while True:
                 options = show_menu_by_role(role)
                 if not options:
