@@ -144,7 +144,51 @@ class ReservationCalendar:
         except sqlite3.Error as e:
             print("Error while connecting to database: ",str(e))
             raise
-        
+
+    def login(self, login_username):
+
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
+            user = cursor.fetchone()
+            conn.close()
+            return user
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
+    def retrieve_admin_check(self, username):
+
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
+            count = cursor.fetchone()[0]
+            cursor.execute("SELECT role FROM User WHERE username = ?", (username,))
+            user_role = cursor.fetchone()[0]
+            conn.close()
+            return count, user_role
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
+    def retrieve_by_id(self, reservation_id):
+
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT customer FROM Reservation WHERE reservation_id = ?", (reservation_id,))
+            reserv = cursor.fetchone()
+            conn.close()
+            return reserv
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
     def retrieve_by_date(self, daterange):
 
         try:
@@ -268,7 +312,57 @@ class ReservationCalendar:
             print("Database error: ",str(e))
             raise
         
+    def add_user(self, username, password_hash, salt, user_role):
 
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO User (username, password_hash, salt, role) VALUES (?, ?, ?, ?)", 
+                       (username, password_hash, salt, user_role))
+            conn.commit()
+            conn.close()
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
+    def remove_user(self, username):
+
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM User WHERE username = ?", (username,))
+            conn.commit()
+            conn.close()
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
+    def update_user_role(self, new_role, username):
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE User SET role = ? WHERE username = ?", (new_role, username))
+            conn.commit()
+            conn.close()
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
+    def update_user_password(self, new_hashed_password, new_salt, username):
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
+                       (new_hashed_password, new_salt, username))
+            conn.commit()
+            conn.close()
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
     
     def remove_reservation(self, reservation_id):
 
