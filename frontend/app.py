@@ -395,17 +395,14 @@ class CLI:
             None: If the user types 'exit' during the prompt.
             
         '''
-        print(f'command index: {command_index}')
         command = command_index
         data = {}
         for input_def in command["inputs"]:
-            print(f'input_def = {input_def}\n')
             user_input = self.prompt_input(input_def)
             if user_input is None:  # User typed 'exit'
                 return
             data[input_def["tag"]] = urllib.parse.quote(user_input)
 
-        print(f'Data = {[x for x in data]}')
         response = self.api_handler.make_request(command, data)
         if command["name"] == "Login" and response:
             self.api_handler.set_token(response['access_token'])
@@ -432,7 +429,6 @@ class CLI:
     # @retry_input({"prompt": "", "validate": lambda x: True})  # Placeholder for actual validation logic
     def prompt_input(self, input_def):
         while True:
-            print(input_def["prompt"])
             user_input = input(input_def["prompt"])
             if user_input.lower() == 'exit':
                 return None
