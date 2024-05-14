@@ -1,418 +1,448 @@
 import requests
-import json
-import hashlib
-import os
-import sqlite3
-from getpass import getpass
-from datetime import datetime
+from requests.exceptions import RequestException
+import urllib.parse
+from functools import wraps 
 
-BASE_URL = "http://localhost:8000"
-
-def validate_datetime(date):
-    try:
-        datetime.strptime(date, '%Y-%m-%d %H:%M')
-        return True
-    except ValueError:
-        return False
-
-def connect_db():
-    return sqlite3.connect('../reservationDB.db')
-
-def hash_password(password, salt):
-    return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
-
-def login():
-    login_username = input("Enter username: ")
-    password = getpass("Enter password: ")
-    
-    try:
-        response = requests.get(f"{BASE_URL}/login/{login_username}")
-        user = None
-        if response.status_code == 200:
-            user_data = response.json()
-            if 'user' in user_data:
-                user = user_data['user']
-        if user:
-            hashed_password = hash_password(password, user['salt'])
-
-            if hashed_password == user['password_hash'] == '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215':
-                print("You currently are using a temp password and need to change it: ")
-                global username, role
-                username = login_username
-                role = user['role']
-                change_user_password()
-                return login_username, user['role']
-            elif hashed_password == user['password_hash']:
-                return login_username, user['role']  # Return the role of the user
-            else:
-                print("Incorrect password")
-        else:
-            print("User not found")
-    except Exception as e:
-        print(f"Database error: {str(e)}")
-    return None, None
-
-def logout():
-    global username, role
-    username = None
-    role = None
-    print("Logged out successfully. Returning to login page.")
-
-def get_machine_choice():
-    """
-    This function gets the user's choice of machine
-    """
-    print("\n\n1. Multi-phasic radiation scanner\n2. Ore scooper\n3. 1.21 gigawatt lightning harvester\n\n")
-    choice = input("\nEnter your machine choice: ")
-    if choice == '1':
-        machine = "scanner"
-    elif choice == '2':
-        machine = "scooper"
-    elif choice == '3':
-        machine = "harvester"
-    else:
-        print("\nInvalid choice. Back to the main menu\n")
-        return
-    return machine
-
-def make_reservation():
-    if role not in ['admin', 'scheduler', 'customer']:
-        print("You do not have permission to make reservations.")
-        return
-
-    try:
-        if role == 'customer':
-            customer_name = username  # Customers can only make reservations for themselves
-        else:
-            customer_name = input("\nEnter customer name: ")  # Schedulers can make reservations for anyone
-        
-        machine = get_machine_choice()
-        if not machine:
-            return    
-        start_date = input("\nEnter start date (YYYY-MM-DD HH:MM): ")
-        end_date = input("\nEnter end date (YYYY-MM-DD HH:MM): ")
-
-        if not validate_datetime(start_date) or not validate_datetime(end_date):
-            print("\nInvalid date. Please use the specified format.\n")
-            return
-
-        data ={
-            "customer_name": customer_name,
-            "machine_name": machine,
-            "start_date": start_date,
-            "end_date": end_date
-        }
-        
-        response = requests.post(f"{BASE_URL}/reservations", json=data)
-        if response.status_code == 201:
-            print("\nReservation added successfully")
-        else:
-            error_detail = response.json().get('detail', 'Unknown error occurred')
-            print(f"\nError occurred while adding reservation: {error_detail}")
-    except Exception as e:
-        print(f"\nError occurred while adding reservation: {str(e)}")
-
-def cancel_reservation():
-    if role not in ['admin', 'scheduler', 'customer']:
-        print("You do not have permission to cancel reservations.")
-        return
-
-    try:
-        reservation_id = input("\nEnter id of the reservation to cancel: ")
-        if role == 'customer':
-            # Verify that the reservation belongs to the logged-in customer
-            
-            response = requests.get(f"{BASE_URL}/reservations/id/{reservation_id}")
-            reservation = None
-            if response.status_code == 200:
-                reserv_data = response.json()
-                if 'reserv' in reserv_data:
-                    reservation = reserv_data['reserv']
-            if reservation is None:
-                print("Reservation not found.")
-                return
-            elif reservation['customer'] != username: # assume customer in reservation is username of user
-                print("You can only cancel your own reservations.")
-                return
-
-            response = requests.delete(f"{BASE_URL}/reservations/{reservation_id}")
-        else:
-            response = requests.delete(f"{BASE_URL}/reservations/{reservation_id}")
-        if response.status_code == 200:
-            refund = response.json()['refund']
-            print("\nReservation cancelled successfully\nRefund amount: ", refund)
-        else:
-            print(response.json()['detail'])
-    except Exception as e:
-        print("\nAn error occurred ", str(e))
-
-def list_reservations():
-    if role not in ['admin', 'scheduler', 'customer']:
-        print("You do not have permission to view reservations.")
-        return
-
-    if role in ['admin', 'scheduler']:
-        print("\n\n1. List reservations for a given date range\n")
-        print("2. List the reservations for a given machine for a given date range\n")
-        print("3. List the reservations for a given customer for a given date range\n\n")
-        choice = input("\nEnter your choice: ")
-        start_date = input("\nEnter start date (YYYY-MM-DD HH:MM)  :")
-        end_date = input("\nEnter end date (YYYY-MM-DD HH:MM)  :")
-        params = {
-            "start": start_date,
-            "end": end_date
-        } # url parameters
-
-        try:
-            if choice == '1':
-                response = requests.get(f"{BASE_URL}/reservations", params=params)
-
-            elif choice == '2':
-                machine = get_machine_choice()
-                if not machine:
-                    return    
-                response = requests.get(f"{BASE_URL}/reservations/machines/{machine}", params=params)
-
-            elif choice == '3':
-                customer = input("\nEnter customer name: ")  # Schedulers can make reservations for anyone
-                response = requests.get(f"{BASE_URL}/reservations/customers/{customer}", params=params)
-
-            else:
-                print("Invalid choice. Back to the main menu")
-                return
-
-            if response.status_code == 200:
-                reservations_data = response.json()
-                if 'reservations' in reservations_data:
-                    data = reservations_data['reservations']
-                    print(json.dumps(data, indent=2))
-                else: # no reservations found
-                    print(response.json()['message'])
-
-            else:
-                print(response.json()['detail'])
-
-        except Exception as e:
-            print("Error occurred in retrieving reservations ", str(e))
-    else:
-        # in the customer case
-        print("\n\n1. List reservations for a given date range\n")
-        print("2. List the reservations for a given machine for a given date range\n")
-        choice = input("\nEnter your choice: ")
-        start_date = input("\nEnter start date (YYYY-MM-DD HH:MM)  :")
-        end_date = input("\nEnter end date (YYYY-MM-DD HH:MM)  :")
-        params = {
-            "start": start_date,
-            "end": end_date
-        } # url parameters
-
-        try:
-            customer = username
-            if choice == '1':
-                response = requests.get(f"{BASE_URL}/reservations/customers/{customer}", params=params)
-
-            elif choice == '2':
-                machine = get_machine_choice()
-                if not machine:
-                    return    
-                response = requests.get(f"{BASE_URL}/reservations/machines/{machine}/customers/{customer}", params=params)
-
-            else:
-                print("Invalid choice. Back to the main menu")
-                return
-
-            if response.status_code == 200:
-                reservations_data = response.json()
-                if 'reservations' in reservations_data:
-                    data = reservations_data['reservations']
-                    print(json.dumps(data, indent=2))
-                else: # no reservations found
-                    print(response.json()['message'])
-
-            else:
-                print(response.json()['detail'])
-
-        except Exception as e:
-            print("Error occurred in retrieving reservations ", str(e))
-
-# admin management
-def add_user():
-    if role != 'admin':
-        print("Unauthorized access. Only admins can add users.")
-        return
-    
-    username = input("Enter new username: ")
-    user_role = input("Enter user role (customer, scheduler, admin): ")
-    password_hash = hash_password('temp', 'random_salt')
-
-    data ={
-            "username": username,
-            "password_hash": password_hash,
-            "salt": 'random_salt',
-            "role": user_role
-        }
-        
-    response = requests.post(f"{BASE_URL}/users", json=data)
-    if response.status_code == 201:
-        print("\nUser added successfully")
-    else:
-        error_detail = response.json().get('detail', 'Unknown error occurred')
-        print(f"\nError occurred while adding user: {error_detail}")
-
-def remove_user():
-    if role != 'admin':
-        print("Unauthorized access. Only admins can remove users.")
-        return
-    
-    username_to_remove = input("Enter username of the user to remove: ")
-    try:
-        response = requests.get(f"{BASE_URL}/users/admincheck/{username_to_remove}")
-        count, user_role = None, None
-        if response.status_code == 200:
-            data = response.json()
-            count =  data['count']
-            user_role =  data['user_role']
-        if count is None or user_role is None:
-            print("admincheck unsuccessful.")
-            return
-        if count <= 1 and user_role == 'admin':
-            print("Cannot remove the last admin.")
-            return
-        
-        response = requests.delete(f"{BASE_URL}/users/{username_to_remove}")
-        print("User removed successfully.")
-    except Exception as e:
-        print("Failed to remove user: ", str(e))
-
-def change_user_role():
-    if role != 'admin':
-        print("Unauthorized access. Only admins can change user roles.")
-        return
-    
-    username_to_change = input("Enter username of the user to change role: ")
-    new_role = input("Enter new role (customer, scheduler, admin): ")
-    try:
-        response = requests.get(f"{BASE_URL}/users/admincheck/{username_to_change}")
-        count, user_role = None, None
-        if response.status_code == 200:
-            data = response.json()
-            count =  data['count']
-            user_role =  data['user_role']
-        if count is None or user_role is None:
-            print("admincheck unsuccessful.")
-            return
-        if count <= 1 and user_role == 'admin':
-            print("Cannot change role of the last admin.")
-            return
-
-        response = requests.patch(f"{BASE_URL}/users/{username_to_change}/roles/{new_role}")
-        print("User role updated successfully.")
-    except Exception as e:
-        print("Failed to change user role: ", str(e))
-
-def change_user_password():
-    try:
-        # Enter new password
-        new_password = getpass("Enter your new password: ")
-
-        # Hash the new password
-        new_salt = os.urandom(32).hex()  # Generate a new salt
-        new_hashed_password = hash_password(new_password, new_salt)
-        
-        customer_name = username  # Customers can only make reservations for themselves
-
-        data ={
-            "username": customer_name,
-            "password_hash": new_hashed_password,
-            "salt": new_salt,
-            "role": role
-        }
-
-        # Update the password in the database
-        response = requests.patch(f"{BASE_URL}/password/update", json=data)
-        print("Password changed successfully.")
-        
-    except Exception as e:
-        print(f"Error while changing password: {str(e)}")
-
-
-def reset_password():
-    if role != 'admin':
-        print("Unauthorized access. Only admins can change user roles.")
-        return
-    
-    username_to_change = input("Enter username of the user to reset their password: ")
-    try:
-
-        data ={
-            "username": username_to_change,
-            "password_hash": '4d997b5e8d99318eb2d0a062a8a7b5901e16afcc0db7c114ec5c8c9ad5d1b215',
-            "salt": 'random_salt',
-            "role": role
-        }
-
-        # Update the password in the database
-        response = requests.patch(f"{BASE_URL}/password/update", json=data)
-        print("Password reset successfully.")
-    except Exception as e:
-        print("Failed to reset password: ", str(e))
-
-
-# UI
-def show_menu_by_role(role):
-    actions = {
-        'customer': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change My Password", "5. Logout", "6. Exit"],
-        'scheduler': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change My Password", "5. Logout", "6. Exit"],
-        'admin': ["1. Make reservation", "2. Cancel reservation", "3. List reservations", "4. Change My Password", "5. Logout", "6. Exit", "7. Add user", "8. Remove user", "9. Change user role", "10. Reset Password"]
+# This dictionary is to be refactored into a command validating class and the dictionary text, so the later can be
+# kept on the server with only valid commands per role being returned to the client for display.
+# Would probably also be easier to reproduce the lambda functions via javascript but i'd have to look into that.
+menu = {
+        "commands": [
+            {
+                "name": "Login",
+                "roles": None,
+                "route": "/login",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "username: ",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Username must be a valid string."
+                    },
+                    {
+                        "prompt": "password: ",
+                        "tag": "password",
+                        "validate": "string",
+                        "error_message": "Invalid Password format. Please try again."
+                    }
+                ]
+            },{
+                "name": "Make reservation",
+                "roles": ["admin", "scheduler", "customer"],
+                "route": "/reservations",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "Enter start date (YYYY-MM-DD HH:MM)",
+                        "start_date": "start_date",
+                        "validate": "datetime",
+                        "error_message": "Invalid date format or past date entered. Please try again."
+                    },
+                    {
+                        "prompt": "Enter end date (YYYY-MM-DD HH:MM)",
+                        "tag": "end_date",
+                        "validate": "datetime",
+                        "error_message": "Invalid date format or past date entered. Please try again."
+                    },
+                    {
+                        "prompt": "Select the machine type",
+                        "tag": "machine",
+                        "validate": "enum",
+                        "options": ["Type A", "Type B", "Type C"],
+                        "error_message": "Invalid machine type selected. Please try again."
+                    },
+                    {
+                        "prompt": "Enter customer name",
+                        "tag": "customer_name",
+                        "roles": ["admin", "scheduler"],
+                        "validate": "string",
+                        "error_message": "Invalid name entered. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "Cancel reservation",
+                "roles": ["admin", "scheduler", "customer"],
+                "route": "/reservation",
+                "method": "DELETE",
+                "inputs": [
+                    {
+                        "prompt": "Enter the reservation ID to cancel",
+                        "tag": "reservation_id",
+                        "validate": "integer",
+                        "error_message": "Invalid reservation ID. Please enter a positive integer."
+                    }
+                ]
+            },
+            {
+                "name": "List reservations by customer and date",
+                "roles": ["admin", "scheduler", "customer"],
+                "route": "/reservations/customers",
+                "method": "GET",
+                "inputs": [
+                    {
+                        "prompt": "Enter start date (YYYY-MM-DD)",
+                        "tag": "start_date",
+                        "validate": "date",
+                        "error_message": "Invalid start date. Please try again."
+                    },
+                    {
+                        "prompt": "Enter end date (YYYY-MM-DD)",
+                        "tag": "end_date",
+                        "validate": "date",
+                        "error_message": "Invalid end date. Please try again."
+                    },
+                    # {
+                    #     "prompt": "Select the machine type",
+                    #     "validate": "enum",
+                    #     "options": ["Type A", "Type B", "Type C"],
+                    #     "error_message": "Invalid machine type selected. Please try again."
+                    # },
+                    {
+                        "prompt": "Enter customer name",
+                        "roles": ["admin", "scheduler"],
+                        "tag": "customer_name",
+                        "validate": "string",
+                        "error_message": "Invalid name entered. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "List reservations by machine and date",
+                "roles": ["admin", "scheduler", "customer"],
+                "route": "/reservations/machines",
+                "method": "GET",
+                "inputs": [
+                    {
+                        "prompt": "Enter start date (YYYY-MM-DD)",
+                        "tag": "start_date",
+                        "validate": "date",
+                        "error_message": "Invalid start date. Please try again."
+                    },
+                    {
+                        "prompt": "Enter end date (YYYY-MM-DD)",
+                        "tag": "end_date",
+                        "validate": "date",
+                        "error_message": "Invalid end date. Please try again."
+                    },
+                    {
+                        "prompt": "Select the machine type",
+                        "tag": "machine",
+                        "validate": "enum",
+                        "options": ["scanner", "Type B", "Type C"],
+                        "error_message": "Invalid machine type selected. Please try again."
+                    }
+                    # {
+                    #     "prompt": "Enter customer name",
+                    #     "roles": ["admin", "scheduler"],
+                    #     "tag": "customer_name",
+                    #     "validate": "string",
+                    #     "error_message": "Invalid name entered. Please try again."
+                    # }
+                ]
+            },
+            {
+                "name": "Change My Password",
+                "roles": ["admin", "scheduler", "customer"],
+                "route": "/change-password",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "Enter your old password",
+                        "tag": "old_password",
+                        "validate": "password",
+                        "error_message": "Invalid password format. Please try again."
+                    },
+                    {
+                        "prompt": "Enter your new password",
+                        "tag": "new_password",
+                        "validate": "password",
+                        "error_message": "Invalid password format. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "Logout",
+                "route": "/logout",
+                "method": "POST",
+                "roles": ["admin", "scheduler", "customer"]
+            },
+            {
+                "name": "Exit",
+                "roles": ["admin", "scheduler", "customer"]
+            },
+            {
+                "name": "Add user",
+                "roles": ["admin"],
+                "route": "/users",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "Enter new username",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid username. Please try again."
+                    },
+                    {
+                        "prompt": "Enter user role (customer, scheduler, admin)",
+                        "tag": "role",
+                        "validate": "enum",
+                        "options": ["customer", "scheduler", "admin"],
+                        "error_message": "Invalid role. Please select from customer, scheduler, admin."
+                    },
+                    {
+                        "prompt": "Enter new password",
+                        "tag": "password",
+                        "validate": lambda x: len(x) > 0,
+                        "error_message": "Invalid password format. Please try again."
+                    },
+                    {
+                        "prompt": "Salt",
+                        "tag": "salt",
+                        "validate": "string",
+                        "error_message": "Invalid password format. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "Remove user",
+                "roles": ["admin"],
+                "route": "/users",
+                "method": "DELETE",
+                "inputs": [
+                    {
+                        "prompt": "Enter username of the user to remove",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid username. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "Change user role",
+                "roles": ["admin"],
+                "route": "/users",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "Enter username of the user to change role",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid username. Please try again."
+                    },
+                    {
+                        "prompt": "Enter new role (customer, scheduler, admin)",
+                        "tag": "new_role",
+                        "validate": "enum",
+                        "options": ["customer", "scheduler", "admin"],
+                        "error_message": "Invalid role. Please select from customer, scheduler, admin."
+                    }
+                ]
+            },
+            {
+                "name": "Reset Password",
+                "roles": ["admin"],
+                "route": "/reset-password",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "Enter username for password reset",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid username. Please try again."
+                    }
+                ]
+            }
+        ]
     }
-    if role in actions:
-        return actions[role]
-    return []
 
-def main():
-    print("\nWelcome to the Reservation System!\n")
-    global username, role
-    while True:
-        username, role = login()
-        print("\n")
-        break_outer = False
-        if username is not None:
-            while True:
-                options = show_menu_by_role(role)
-                if not options:
-                    print("No available actions for this role.")
-                    return
-                for option in options:
-                    print(option)
-                
-                choice = input("\nEnter your choice: ")
-                if choice == '1':
-                    make_reservation()
-                elif choice == '2':
-                    cancel_reservation()
-                elif choice == '3':
-                    list_reservations()
-                elif choice == '4':
-                    change_user_password()
-                elif choice == '5':
-                    logout()
-                    break
-                elif choice == '6':
-                    break_outer = True
-                    break
-                elif choice == '7' and role == 'admin':
-                    add_user()
-                elif choice == '8' and role == 'admin':
-                    remove_user()
-                elif choice == '9' and role == 'admin':
-                    change_user_role()
-                elif choice == '10' and role == 'admin':
-                    reset_password()
-                else:
-                    print("Invalid choice, please try again")
-        if break_outer:
-            break
+
+class APIHandler:
+    '''
+    This class is responsible for making requests to the backend API.
+
+    Attributes:
+        base_url (str): The base URL of the API.
+        headers (dict): The headers to be sent with each request.
+    
+    Methods:
+        set_token(token): Sets the token in the headers for authorization once recieved from logging in
+        make_request(command, data): Makes a request to the API with the given command (from menu) and data (from user input).
+    '''
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.headers = {}
+
+    def set_token(self, token):
+        self.headers['Authorization'] = f'Bearer {token}'
+
+    def make_request(self, command, data):
+        '''
+        make_request makes a request to the API with the given command and data.
         
+        Args:
+            command (dict): The command to be executed from the menu. 
+        Formatted { name: str,
+                    roles: list,
+                    route: str, 
+                    method: str, 
+                    inputs: list of dicts }
+        data (dict): The data to be sent with the request. Formatted { tag: value }.
 
+        Returns:
+            JSON: The response from the API as a JSON object.
+        '''
+        headers = self.headers
+        method = getattr(requests, command["method"].lower(), requests.post)
+        call_method = command["method"].lower()
+        
+        try:
+            if call_method == 'get' or call_method == 'delete':
+                response = method(f'{self.base_url}{command["route"]}', params=data, headers=headers)
+            else:
+                response = method(f'{self.base_url}{command["route"]}', json=data, headers=headers)
+            response.raise_for_status()  # Raises an HTTPError for bad responses
+            return response.json()      
+        
+        except RequestException as e:
+            print(f"Request failed: {e}")
+            return None
+
+def retry_input(input_def):
+    '''
+    retry_input is a decorator that prompts the user for input and retries until the input is valid or 'exit' is entered.
+    The input_def dictionary contains the prompt, validation function, and error message for the input.
+    Args:
+        input_def (dict): Formatted: {  prompt: str,
+                                        tag: str,
+                                        validate: function, 
+                                        error_message: str }
+    '''
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            while True:
+                print(f'wrapper running and input_def = {input_def}\n')
+                user_input = input(input_def["prompt"])
+                if user_input.lower() == 'exit':
+                    return None
+           #     if input_def["validate"](user_input):
+                else:
+                    return func(*args, **kwargs, user_input=user_input)
+                # print(input_def["error_message"])
+        return wrapper
+    return decorator
+
+class CLI:
+    '''
+    This class is responsible for handling the command line interface for the user.
+
+    Attributes:
+        api_handler (APIHandler): The APIHandler object for making requests to the backend.
+        is_active (bool): A flag to determine if the CLI is still active.
+    
+    Methods:
+        select_command(): Prompts the user to select a command from the menu dictionary
+        run(): Runs the CLI and prompts the user for input of command index until the user types 'exit'
+    '''
+    def __init__(self, api_handler):
+        self.api_handler = api_handler
+        self.is_active = True
+
+    # @retry_input({"prompt": "Select a command or type 'exit' to quit: ", "validate": lambda x: x.isdigit()})
+    def select_command(self):
+        '''
+        select_command prompts the user to select a command from the menu dictionary.
+
+        Returns:
+            int: The index of the selected command in the menu dictionary.
+        '''
+        while True:
+            choice = input("Select a command or type 'exit' to quit: ")
+            if choice.lower() == 'exit':
+                return None
+            if choice.isdigit() and 0 < int(choice) <= len(menu["commands"]):
+                return int(choice) - 1
+            print("Invalid selection, please try again.")
+
+
+    def run(self):
+        '''
+        run runs the CLI and prompts the user for input of command index until the user types 'exit'.
+
+        '''
+        while self.is_active:
+            print("\nAvailable commands:")
+            for idx, cmd in enumerate(menu["commands"], 1):
+                print(f"{idx}. {cmd['name']}")
+            command_index = self.select_command()
+            if command_index is None:
+                self.is_active = False
+                continue
+            selected_command = menu["commands"][command_index]
+            self.handle_prompt(selected_command)
+
+    def handle_prompt(self, command_index):
+        '''
+        handle_prompt prompts the user for input based on the selected command's input requirements 
+        and sends the data to the API.
+
+        Args:
+            command_index (int): The index of the selected command in the menu dictionary.
+        
+        returns:
+            None: If the user types 'exit' during the prompt.
+            
+        '''
+        print(f'command index: {command_index}')
+        command = command_index
+        data = {}
+        for input_def in command["inputs"]:
+            print(f'input_def = {input_def}\n')
+            user_input = self.prompt_input(input_def)
+            if user_input is None:  # User typed 'exit'
+                return
+            data[input_def["tag"]] = urllib.parse.quote(user_input)
+
+        print(f'Data = {[x for x in data]}')
+        response = self.api_handler.make_request(command, data)
+        if command["name"] == "Login" and response:
+            self.api_handler.set_token(response['access_token'])
+        print("Response:", response if response else "Failed to get a valid response from the server.")
+
+
+    @retry_input({"prompt": "Select a command or type 'exit' to quit: ", "validate": lambda x: x.isdigit()})
+    def select_command(self, user_input):
+        '''
+        select_command takes the user response to select a command from the menu dictionary.
+
+        Args:
+            user_input (str): string representation of int to select a command from the menu dictionary.
+
+        Returns:
+            int: _description_
+        '''
+        command_index = int(user_input) - 1
+        if command_index < len(menu["commands"]):
+            return command_index
+        print("Invalid selection, please try again.")
+        return None
+
+    # @retry_input({"prompt": "", "validate": lambda x: True})  # Placeholder for actual validation logic
+    def prompt_input(self, input_def):
+        while True:
+            print(input_def["prompt"])
+            user_input = input(input_def["prompt"])
+            if user_input.lower() == 'exit':
+                return None
+            # if input_def["validate"](user_input):
+            return user_input
+            print(input_def["error_message"])
+
+
+# Main execution
 if __name__ == "__main__":
-    main()
+    api_handler = APIHandler('http://localhost:8000')
+    cli = CLI(api_handler)
+    cli.run()

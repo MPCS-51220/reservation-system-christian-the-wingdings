@@ -1,80 +1,61 @@
-from fastapi import FastAPI, HTTPException, status, Query, Depends, Header
-from modules import Reservation, ReservationCalendar, DateRange, UserManager
-from datetime import datetime
-from pydantic import BaseModel
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from token_manager import create_access_token, decode_access_token
-from permissions import role_required
+from fastapi import FastAPI, HTTPException, status, Request, Query, Depends
+import urllib.parse
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+from permissions import validate_user, role_required
+from modules import Reservation, ReservationCalendar, UserManager, DateRange
+from token_manager import create_access_token
+from schema import Reservation, User
 
-class ReservationRequest(BaseModel):
-    customer_name: str
-    machine_name: str
-    start_date: str
-    end_date: str
 
-class UserRequest(BaseModel):
-    username: str
-    password_hash: str
-    salt: str
-    role: str
-
-app = FastAPI() 
-
+app = FastAPI()
 calendar = ReservationCalendar()
-
 
 @app.get("/")
 def root():
     return {"message": "Hello World"}
 
-#@app.post("/add_user/")
-#async def add_user(username: str, password: str, role: str, salt: str, user_manager: UserManager = Depends()):
-#    try:
-#        user_manager.add_user(username, password, role, salt)
-#        return {"message": "User added successfully"}
-#    except Exception as e:
-#        raise HTTPException(status_code=400, detail=str(e))
+@app.post("/login")
+async def login(userlog: User, user_manager: UserManager = Depends()):
+   user = user_manager.authenticate_user(userlog.username, userlog.password)
+   if not user:
+       raise HTTPException(status_code=401, detail="Incorrect username or password")
+   access_token = create_access_token(data={"sub": user['username'],
+                                            "role": user['role']
+                                            })
+   return {"access_token": access_token, "token_type": "bearer"}
 
+add_user_permissions = {
+    "admin": None
+}
+@app.post("/users")
+@validate_user
+@role_required(add_user_permissions)
+async def add_user(request: Request,
+                   user_request: User):
 
-#@app.post("/login/")
-#async def login_for_access_token(username, password, user_manager: UserManager = Depends(UserManager)):
-#    user = user_manager.authenticate_user(username, password)
-#    if not user:
-#        raise HTTPException(status_code=401, detail="Incorrect username or password")
-#    access_token = create_access_token(data={"sub": user['username'], "role": user['role']})
-#    return {"access_token": access_token, "token_type": "bearer"}
-
-#def get_current_user(token: str = Depends(oauth2_scheme)):
-#    credentials_exception = HTTPException(
-#        status_code=status.HTTP_401_UNAUTHORIZED,
-#        detail="Could not validate credentials",
-#        headers={"WWW-Authenticate": "Bearer"},
-#    )
-#    return decode_access_token(token) or credentials_exception
-
-@app.get("/login/{username}", status_code=status.HTTP_200_OK)
-def login(username: str):
-    user = calendar.login(username)
-    return {"user":user}
-
-@app.get("/users/admincheck/{username}", status_code=status.HTTP_200_OK)
-def get_admins(username: str):
-    count, user_role = calendar.retrieve_admin_check(username)
-    return {"count":count, "user_role": user_role}
-
-@app.post("/users", status_code=status.HTTP_201_CREATED)
-def add_user(user_request: UserRequest):
+    user_manager = UserManager()
     try:
-        calendar.add_user(user_request.username, user_request.password_hash, user_request.salt, user_request.role)
-        return {"message": "User added successfully!"}
+        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)    
+        return {"message": f'{user_request.username} added successfully'}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f'Failed to add reservation due to {e}')
+                            detail=f'Failed to add user due to {e}')
+
+
+def is_customer_accessing_own_data(user_username, customer_name):
+    return user_username == customer_name
+
+add_reservation_permissions = {
+    "admin": None,  # No additional checks needed for admin
+    "scheduler": None,  # No additional checks needed for scheduler
+    "customer": is_customer_accessing_own_data  # Customers can only access their own data
+}
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
-def add_reservation(reservation_request: ReservationRequest):
+@validate_user
+@role_required(add_user_permissions)
+def add_reservation(request: Request,
+                    reservation_request: Reservation):
     """
     This endpoints attempts to add a reservation with a particular
     customer name, machine, start date and end date. It returns a 
@@ -83,7 +64,10 @@ def add_reservation(reservation_request: ReservationRequest):
     """
     
     try:
-        reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
+        start = urllib.parse.unquote(reservation_request.start_date)
+        end = urllib.parse.unquote(reservation_request.end_date)
+
+        reservation_date = DateRange(start, end)
         reservation = Reservation(reservation_request.customer_name, reservation_request.machine_name, reservation_date)
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
@@ -91,36 +75,39 @@ def add_reservation(reservation_request: ReservationRequest):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
-        
-        
-@app.get("/reservations/id/{reservation_id}", status_code=status.HTTP_200_OK)
-def login(reservation_id: str):
-    reserv = calendar.retrieve_by_id(reservation_id)
-    return {"reserv":reserv}
-  
-# Condition for customers to only access their data
-def is_customer_accessing_own_data(user_username, customer_name):
-    return user_username == customer_name
+
+
+
+
+
 
 get_reservation_permissions = {
-    "admin": None,  # No additional checks needed for admin
-    "scheduler": None,  # No additional checks needed for scheduler
-    "customer": is_customer_accessing_own_data  # Customers can only access their own data
+    "admin": None,
+    "scheduler": None,
+    "customer": is_customer_accessing_own_data
 }
 
-@app.get("/reservations/customers/{customer_name}", status_code=status.HTTP_200_OK)
-#@role_required(get_reservation_permissions)
-def get_reservations_by_customer(customer_name: str, 
-                                  start: str = Query(..., description="Start date of the reservation period"),
-                                  end: str = Query(..., description="End date of the reservation period")):
-    
+@app.get("/reservations/customers", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(get_reservation_permissions)
+async def get_reservations_by_customer(request: Request,
+                                      customer_name: str = None, 
+                                      start_date: str = Query(..., description="Start date of the reservation period"),
+                                      end_date: str = Query(..., description="End date of the reservation period")):
     """
     This endpoint retrieves the reservations made by a customer
     in a particular date range. It returns an appropriate message
     if no such reservations are found.
     """
+    if customer_name is None:
+        customer_name = request.state.user
+
     try:
-        if start and end:
+        if start_date and end_date:
+           
+            start = urllib.parse.unquote(start_date)
+            end = urllib.parse.unquote(end_date)
+
             daterange = DateRange(start, end)
             reservations = calendar.retrieve_by_customer(daterange, customer_name)
         else:
@@ -133,21 +120,37 @@ def get_reservations_by_customer(customer_name: str,
         
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to get reservations due to {e}')
-    
-@app.get("/reservations/machines/{machine_name}", status_code=status.HTTP_200_OK)
-def get_reservations_by_machine(machine_name: str, 
-                                  start: str = Query(..., description="Start date of the reservation period"),
-                                  end: str = Query(..., description="End date of the reservation period")):
+                            detail=f'Failed to get reservations due to {e}')
+
+
+
+
+
+get_reservation_by_machine_permissions = {
+    "admin": None,
+    "scheduler": None,
+    "customer": is_customer_accessing_own_data
+}
+
+@app.get("/reservations/machines", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(get_reservation_by_machine_permissions)
+async def get_reservations_by_machine(request: Request,
+                                machine: str, 
+                                start_date: str = Query(..., description="Start date of the reservation period"),
+                                end_date: str = Query(..., description="End date of the reservation period")):
     """
     This endpoint retrieves the reservations made for a machine
     in a particular date range. It returns an appropriate message
     if no such reservations are found.
     """
     try:
-        if start and end:
+        if start_date and end_date:
+            start = urllib.parse.unquote(start_date)
+            end = urllib.parse.unquote(end_date)
+
             daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_machine(daterange, machine_name)
+            reservations = calendar.retrieve_by_machine(daterange, machine)
         else:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
         
@@ -159,37 +162,22 @@ def get_reservations_by_machine(machine_name: str,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to get reservations due to {e}')
-    
 
-@app.get("/reservations/machines/{machine_name}/customers/{customer_name}", status_code=status.HTTP_200_OK)
-def get_reservations_by_machine(machine_name: str, 
-                                customer_name: str,
-                                  start: str = Query(..., description="Start date of the reservation period"),
-                                  end: str = Query(..., description="End date of the reservation period")):
-    """
-    This endpoint retrieves the reservations made for a machine
-    in a particular date range. It returns an appropriate message
-    if no such reservations are found.
-    """
-    try:
-        if start and end:
-            daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_machine_and_customer(daterange, machine_name, customer_name)
-        else:
-            raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        
-        if reservations:
-            return {"reservations":[vars(reservation) for reservation in reservations]}
-        else:
-            return {"message": "No reservations found for this machine."}
-        
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to get reservations due to {e}')
 
-    
-@app.delete("/reservations/{reservation_id}", status_code=status.HTTP_200_OK)
-def cancel_reservation(reservation_id: str):
+
+
+
+del_reservation_permissions = {
+    "admin": None,
+    "scheduler": None,
+    "customer": is_customer_accessing_own_data
+}
+
+@app.delete("/reservations", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(del_reservation_permissions)
+async def cancel_reservation(request: Request,
+                             reservation_id: str):
     """
     This endpoint attempts to cancel a reservation. If no 
     such reservation is found, a status code 404 is returned.
@@ -203,53 +191,63 @@ def cancel_reservation(reservation_id: str):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
-    
 
-@app.delete("/users/{username}", status_code=status.HTTP_200_OK)
-def remove_user(username: str):
+
+
+del_user_permissions = {
+    "admin": None,  # No additional checks needed for admin
+}
+@app.delete("/users", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(del_user_permissions)
+async def remove_user(request: Request,
+                      username: str):
     try:
         calendar.remove_user(username)
+        return {"message": f"{username} deleted successfully"}
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
-    
 
-@app.patch("/users/{username}/roles/{role}", status_code=status.HTTP_200_OK)
-def update_user_role(role: str, username: str):
+
+
+
+
+patch_user_role_permissions = {
+    "admin": None,
+    "scheduler": None,
+}
+@app.patch("/users/role", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(patch_user_role_permissions)
+async def update_user_role(request: Request,
+                           username: str = Query(..., description="user to patch"),
+                           role: str = Query(..., description="new role for user")):
     try:
         calendar.update_user_role(role, username)
+        return {"message": f"{username} role changed to {role} successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
-    
-@app.patch("/password/update", status_code=status.HTTP_200_OK)
-def update_user_role(user_request: UserRequest):
+
+
+
+
+patch_user_password_permissions = {
+    "admin": None,
+    "scheduler": None,
+    "customer": is_customer_accessing_own_data
+}
+@app.patch("/users/password", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(patch_user_password_permissions)
+def update_user_password(request: Request,
+                         user_request: User):
     try:
-        calendar.update_user_password(user_request.password_hash, user_request.salt, user_request.username)
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to cancel reservation due to {e}')
-    
-    
-@app.get("/reservations", status_code=status.HTTP_200_OK)
-def get_reservations_by_date(start: str = Query(None), end: str = Query(None)): 
-    """
-    This endpoint retrieves the reservations in a particular
-    date range. It returns an appropriate message if no such 
-    reservations are found.
-    """
-    
-    if not start or not end: # url parameters missing
-        raise HTTPException(status_code=400, detail="Start and end dates are required") 
-    
-    try:
-        date_range = DateRange(start, end)
-        reservations = calendar.retrieve_by_date(date_range)
-        if reservations:
-            # convert Reservation objects to dictionaries
-            return {"reservations":reservations}
-        return {"message":"No reservations found in this date range"}
+        UserManager.update_password(user_request.username, user_request.password, user_request.salt)
+        return {"message": f"password for {user_request.username} was changed successfully"}
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to get reservations due to {e}')
+                    detail=f'Failed to cancel reservation due to {e}')

@@ -2,12 +2,25 @@ import uuid
 from datetime import datetime, date
 import sqlite3
 import hashlib
-#from passlib.context import CryptContext
-
-#pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserManager:
-    ''' A class to manage user authentication and authorization.'''
+    '''
+    A class to manage funtions that need to effect a user.
+
+    This class provides a way to add a user, get a user, 
+    verify a password, authenticate a user, and update their password.
+
+    Attributes:
+        db_path (str): Path to the database file.
+        
+    Methods:
+        add_user(username, password, role, salt): Adds a new user to the database.
+        hash_password(password, salt): Hashes a password using PBKDF2.
+        get_user(username): Retrieves a user from the database.
+        verify_password(plain_password, password_hash, salt): Verifies a password against a hash.
+        authenticate_user(username, password): Authenticates a user using a username and password.
+        update_password(username, password, salt): Updates a user's password in the database.
+    '''
     
     def __init__(self):
         self.db_path = '../reservationDB.db'
@@ -42,7 +55,6 @@ class UserManager:
             return True
         else:
             return False
-        # return pwd_context.verify(plain_password, password_hash)
 
     def authenticate_user(self, username: str, password: str):
         """Authenticate a user using username and password."""
@@ -50,6 +62,21 @@ class UserManager:
         if user and self.verify_password(password, user['password_hash'], user['salt']):
             return user
         return False
+
+    def update_password(self, username, password, salt):
+        """Update a user's password in the database."""
+        password_hash = self.hash_password(password, salt)
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", (password_hash, salt, username))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+            
+
 
 
 
@@ -238,8 +265,11 @@ class ReservationCalendar:
     def retrieve_by_customer(self, daterange, customer):
 
         try:
+            print(f"Retrieve_by_customer: {customer} is trying to retrieve reservations")
             start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            print(f"Start date: {start}")
             end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            print(f"End date: {end}")
             query = """
             SELECT * FROM Reservation WHERE customer = ? 
             AND datetime(start_date) <= datetime(?)
@@ -250,6 +280,7 @@ class ReservationCalendar:
             cursor.execute(query, (customer, end, start))
             rows = cursor.fetchall()
             conn.close()
+            print(f"Rows: {rows}")
             return [dict(row) for row in rows] 
         
         except sqlite3.Error as e:

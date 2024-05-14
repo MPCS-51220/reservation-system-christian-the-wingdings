@@ -1,33 +1,72 @@
 # permissions.py
 
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status
+from functools import wraps
+from jose import jwt
 from token_manager import decode_access_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+def validate_user(f):
+    '''
+    validate_user is a decorator that checks if the user is authenticated and has a valid token.
+    If the token is valid, the user and role are added to the request state.
 
-def role_required(role_permissions: dict):
-    def decorator(func):
-        async def wrapper(token: str = Depends(oauth2_scheme), *args, **kwargs):
-            decoded_token = decode_access_token(token)
-            user_role = decoded_token.get('role') if decoded_token else None
-            user_username = decoded_token.get('sub') if decoded_token else None
+    Args:
+        f (__function__): The function to be wrapped
+
+    Raises:
+        HTTPException 401: If the token is invalid
+
+    Returns:
+        __function__: The wrapped function if the token is valid with the user and role added to the request state
+    '''
+    @wraps(f)
+    async def wrapper(*args, **kwargs):
+        request = kwargs.get('request')
+        token = request.headers.get('Authorization')
+        if token.startswith('Bearer '):
+            token = token[7:]
+        try:
+            payload = decode_access_token(token)
+            user: str = payload.get("sub")
+            role: str = payload.get("role")
             
-            if user_role in role_permissions:
-                permission_condition = role_permissions[user_role]
-                # Evaluate the condition, if it's callable
-                if callable(permission_condition):
-                    if not permission_condition(user_username, *args, **kwargs):
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Insufficient permissions"
-                        )
-                # Allow access if the role matches and no additional conditions are required
-                return await func(*args, **kwargs)
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Role not allowed"
-                )
+            if not role or not user:
+                raise HTTPException(status_code=401, detail="Invalid token")
+            request.state.role = role
+            request.state.user = user
+
+            return await f(*args, **kwargs)
+        except jwt.JWTError:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    return wrapper
+
+
+def role_required(roles_permissions: dict):
+    '''
+    role_required is a decorator that checks if the user has the required role to access the endpoint.
+    The roles_permissions dictionary contains the role as the key and a condition function as the value.
+    If the role is in the dictionary and the condition function is met, the function is executed.
+    role and user are defined from the request state and reference the jwt from the header of a request.
+
+    Args:
+        roles_permissions (dict): A dictionary with the role as the key and a condition function as the value
+    
+    Raises:
+        HTTPException 403: If the user does not have the required role
+    
+    Returns:
+        __function__: The wrapped function if the user has the required role and condition function is met
+    '''
+    def decorator(f):
+        @wraps(f)
+        async def wrapper(*args, **kwargs):
+            request = kwargs.get('request')
+            role = request.state.role
+            user = request.state.user
+            if role in roles_permissions:
+                condition = roles_permissions[role]
+                if condition is None or condition(user *args, **kwargs):
+                    return await f(*args, **kwargs)
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
         return wrapper
     return decorator
