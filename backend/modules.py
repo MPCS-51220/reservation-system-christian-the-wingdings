@@ -75,7 +75,47 @@ class UserManager:
         except sqlite3.Error as e:
             print("Database error: ",str(e))
             raise e
-            
+        
+    def deactivate_user(self, username):
+        """Deactivate a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET is_active = ? WHERE username = ?", (0, username))
+                conn.commit()
+
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+    def activate_user(self, username):
+        """Activate a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET is_active = ? WHERE username = ?", (1, username))
+                conn.commit()
+                
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+    def list_users(self):
+        """List users with activation state"""
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, is_active FROM User")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+
+
+
 
 
 
@@ -280,7 +320,7 @@ class ReservationCalendar:
             cursor.execute(query, (customer, end, start))
             rows = cursor.fetchall()
             conn.close()
-            print(f"Rows: {rows}")
+            # print(f"Rows: {rows}")
             return [dict(row) for row in rows] 
         
         except sqlite3.Error as e:

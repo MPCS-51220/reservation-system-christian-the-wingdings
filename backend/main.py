@@ -5,10 +5,33 @@ from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
 from schema import Reservation, User
+import sqlite3
+from datetime import datetime
 
 
 app = FastAPI()
 calendar = ReservationCalendar()
+
+
+# def log_operation(username, type, description, timestamp):
+#     """ 
+#     Logs user operations to the database 
+#     """
+#     try:
+#         timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+#         with sqlite3.connect('../reservationDB.db') as conn:
+#             cursor = conn.cursor()
+#             cursor.execute("SELECT user_id FROM USER WHERE username = ?",(username,))
+#             user_id = cursor.fetchone()[0]
+#             query = """
+#                     INSERT INTO Operation (user_id, type, description, timestamp)
+#                     VALUES (?, ?, ?, ?)
+#                     """
+#             cursor.execute(query, (user_id, type, description, timestamp))
+#             conn.commit()
+
+#     except sqlite3.Error as e:
+#         print("Failed to log operation: ", str(e))
 
 @app.get("/")
 def root():
@@ -22,6 +45,7 @@ async def login(userlog: User, user_manager: UserManager = Depends()):
    access_token = create_access_token(data={"sub": user['username'],
                                             "role": user['role']
                                             })
+#    log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
    return {"access_token": access_token, "token_type": "bearer"}
 
 add_user_permissions = {
@@ -35,7 +59,8 @@ async def add_user(request: Request,
 
     user_manager = UserManager()
     try:
-        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)    
+        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)   
+        log_operation() 
         return {"message": f'{user_request.username} added successfully'}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -208,7 +233,7 @@ async def remove_user(request: Request,
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to cancel reservation due to {e}')
+                    detail=f'Failed to delete user due to {e}')
 
 
 
@@ -229,7 +254,7 @@ async def update_user_role(request: Request,
         return {"message": f"{username} role changed to {role} successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to cancel reservation due to {e}')
+                    detail=f'Failed to update user role due to {e}')
 
 
 
@@ -250,4 +275,57 @@ def update_user_password(request: Request,
 
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to cancel reservation due to {e}')
+                    detail=f'Failed to update password due to {e}')
+
+
+deactivate_activate_permissions={
+    "admin":None
+}
+
+@app.patch("/users/deactivate", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(deactivate_activate_permissions)
+def deactivate_user(username: str = Query(..., description="user to deactivate")):
+
+    try:
+        user_manager = UserManager()
+        user_manager.deactivate_user(username)
+        return {"message": f"User {username} has been deactivated."}
+    
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to deactivate user due to {e}')
+    
+
+@app.patch("/users/activate", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(deactivate_activate_permissions)
+def activate_user(username: str = Query(..., description="user to activate")):
+
+    try:
+        user_manager = UserManager()
+        user_manager.activate_user(username)
+        return {"message": f"User {username} has been activated."}
+    
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to activate user due to {e}')
+
+
+@app.get("/users", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(deactivate_activate_permissions)
+def list_users():
+
+    try:
+        user_manager = UserManager()
+        users = user_manager.list_users()
+        return {"users": users}
+    
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to list users due to {e}')
+    
+
+    
+

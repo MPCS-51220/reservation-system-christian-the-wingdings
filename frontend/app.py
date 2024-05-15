@@ -35,7 +35,7 @@ menu = {
                 "inputs": [
                     {
                         "prompt": "Enter start date (YYYY-MM-DD HH:MM)",
-                        "start_date": "start_date",
+                        "tag": "start_date",
                         "validate": "datetime",
                         "error_message": "Invalid date format or past date entered. Please try again."
                     },
@@ -323,7 +323,7 @@ def retry_input(input_def):
         @wraps(func)
         def wrapper(*args, **kwargs):
             while True:
-                print(f'wrapper running and input_def = {input_def}\n')
+                # print(f'wrapper running and input_def = {input_def}\n')
                 user_input = input(input_def["prompt"])
                 if user_input.lower() == 'exit':
                     return None
@@ -397,7 +397,7 @@ class CLI:
         '''
         command = command_index
         data = {}
-        for input_def in command["inputs"]:
+        for input_def in command.get("inputs",[]):
             user_input = self.prompt_input(input_def)
             if user_input is None:  # User typed 'exit'
                 return
