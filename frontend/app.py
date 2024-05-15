@@ -292,6 +292,7 @@ menu = {
                 "name": "List activation state of users",
                 "roles": ["admin"],
                 "route": "/users",
+                "inputs":[],
                 "method": "GET",
             }
 

@@ -114,32 +114,17 @@ class UserManager:
             print("Database error: ",str(e))
             raise e
         
-    # def can_make_reservation(self, username, customer_name):
-    #     """Check if the user is active and the customer is active"""
-        
-    #     try:
-    #         conn = sqlite3.connect('../reservationDB.db')
-    #         conn.row_factory = sqlite3.Row
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
-    #         user = cursor.fetchone()
-    #         cursor.execute("SELECT is_active FROM User WHERE username = ?",(customer_name,))
-    #         customer = cursor.fetchone()
-    #         if user and user['is_active'] and customer and customer['is_active']:
-    #             return True
-    #         return False
-        
-    #     except sqlite3.Error as e:
-    #         print("Database error: ",str(e))
-    #         raise e
 
     def is_user_active(self, username):
+        """Check if a user is active"""
         try:
+            print("i came here")
             conn = sqlite3.connect('../reservationDB.db')
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
             user = cursor.fetchone()
+            print("user",user)
             if user and user['is_active']:
                 return True
             return False
@@ -383,8 +368,11 @@ class ReservationCalendar:
         return False
     
     def add_reservation(self, reservation):
+        print("came hereee 1")
         self._verify_business_hours(reservation)
+        print("came hereee 2")
         self._check_equipment_availability(reservation)
+        print("came hereee 3")
 
         try:
             conn = self.get_db()
@@ -396,11 +384,11 @@ class ReservationCalendar:
                 raise ValueError("Machine not found")
 
             query = """
-            INSERT INTO Reservation (reservation_id, customer, machine_id, 
+            INSERT INTO Reservation (customer, machine_id, 
             start_date, end_date, total_cost, down_payment) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """
-            cursor.execute(query,(reservation.id, reservation.customer, machine_id[0],
+            cursor.execute(query,(reservation.customer, machine_id[0],
                                     reservation.daterange.start_date, reservation.daterange.end_date,
                                     reservation.cost, reservation.down_payment))
             conn.commit()
@@ -511,6 +499,7 @@ class ReservationCalendar:
     def _check_equipment_availability(self, reservation):
 
         overlapping_reservations = self.retrieve_by_date(reservation.daterange)
+        print(overlapping_reservations)
 
         # Count how many scanners, harvesters, and scoopers are reserved in the overlapping period
         scanner_count = 0

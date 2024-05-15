@@ -90,7 +90,7 @@ add_reservation_permissions = {
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
 @validate_user
 @role_required(add_user_permissions)
-def add_reservation(request: Request,
+async def add_reservation(request: Request,
                     reservation_request: Reservation_Req):
     """
     This endpoints attempts to add a reservation with a particular
@@ -100,30 +100,23 @@ def add_reservation(request: Request,
     """
    
     try:
-
+        print("i am HERE")
         user_manager = UserManager()
-        if not user_manager.is_user_active(reservation_request.customer_name) \
-        or not user_manager.is_user_active(request.state.user):
+        if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user):
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
+        print("again here")
 
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
         reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
-
+        print("again here again")
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
    
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
-
-
-
-
-
-
-
 
 
 
@@ -140,7 +133,7 @@ get_reservation_permissions = {
 @validate_user
 @role_required(get_reservation_permissions)
 async def get_reservations_by_customer(request: Request,
-                                      customer_name: str = None,
+                                      customer: str = None,
                                       start_date: str = Query(..., description="Start date of the reservation period"),
                                       end_date: str = Query(..., description="End date of the reservation period")):
     """
@@ -148,8 +141,10 @@ async def get_reservations_by_customer(request: Request,
     in a particular date range. It returns an appropriate message
     if no such reservations are found.
     """
-    if customer_name is None:
-        customer_name = request.state.user
+    if customer is None:
+        customer = request.state.user
+
+    print("Cust: ,",customer)
 
 
     try:
@@ -160,7 +155,7 @@ async def get_reservations_by_customer(request: Request,
 
 
             daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_customer(daterange, customer_name)
+            reservations = calendar.retrieve_by_customer(daterange, customer)
         else:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
        
