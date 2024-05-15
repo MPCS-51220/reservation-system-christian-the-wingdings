@@ -4,11 +4,11 @@ import urllib.parse
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
-from schema import Reservation_Req, User, UserRole
+from schema import Reservation_Req, User, UserRole, BusinessRule
 
 
 app = FastAPI()
-calendar = ReservationCalendar()
+calendar = ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5)
 
 @app.get("/")
 def root():
@@ -40,6 +40,48 @@ async def add_user(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add user due to {e}')
+
+
+def is_customer_accessing_own_data(user_username, customer_name):
+    return user_username == customer_name
+
+add_reservation_permissions = {
+    "admin": None,  # No additional checks needed for admin
+    "scheduler": None,  # No additional checks needed for scheduler
+    "customer": is_customer_accessing_own_data  # Customers can only access their own data
+}
+
+configure_biz_rules_permissions = {
+    "admin": None
+}
+@app.post("/business-rules")
+@validate_user
+@role_required(configure_biz_rules_permissions)
+def configure_business_rules(request: Request,
+                             bizRule: BusinessRule):
+    rule = bizRule.rule
+    value = bizRule.value
+    update_data = {rule: value}
+    origVal = update_data[rule]
+    
+    try:
+        float_value = float(value)
+
+        if float_value.is_integer():
+            update_data[rule] = int(float_value)
+        else:
+            update_data[rule] = float_value
+    except ValueError:
+        update_data[rule] = origVal
+
+    try:
+
+
+        calendar.update_settings(**update_data)    
+        return {"message": f'business rules updated successfully'}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f'Failed to update business rules due to {e}')
 
 
 def is_customer_accessing_own_data(user_username, customer_name):

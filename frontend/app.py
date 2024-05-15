@@ -253,6 +253,26 @@ menu = {
                         "error_message": "Invalid username. Please try again."
                     }
                 ]
+            },
+            {
+                "name": "Configure Business Rules",
+                "roles": ["admin"],
+                "route": "/business-rules",
+                "method": "POST",
+                "inputs": [
+                    {
+                        "prompt": "Enter the rule you wish to change from the list: \n harvester_price \n scooper_price_per_hour \n scanner_price_per_hour \n number_of_scoopers \n number_of_scanners \n weekday_start \n weekday_end \n weekdend_start \n weekend_end \n week_refund \n two_day_refund \n",
+                        "tag": "rule",
+                        "validate": "string",
+                        "error_message": "Invalid rule format. Please try again."
+                    },
+                    {
+                        "prompt": "Enter the value you want for the rule \n",
+                        "tag": "value",
+                        "validate": "string",
+                        "error_message": "Invalid value format. Please try again."
+                    }
+                ]
             }
         ]
     }
