@@ -39,7 +39,7 @@ menu = {
                 "inputs": [
                     {
                         "prompt": "Enter start date (YYYY-MM-DD HH:MM)",
-                        "start_date": "start_date",
+                        "tag": "start_date",
                         "validate": "datetime",
                         "error_message": "Invalid date format or past date entered. Please try again."
                     },
@@ -58,7 +58,7 @@ menu = {
                     },
                     {
                         "prompt": "Enter customer name",
-                        "tag": "customer_name",
+                        "tag": "customer",
                         "roles": ["admin", "scheduler"],
                         "validate": "string",
                         "error_message": "Invalid name entered. Please try again."
@@ -106,7 +106,7 @@ menu = {
                     {
                         "prompt": "Enter customer name",
                         "roles": ["admin", "scheduler"],
-                        "tag": "customer_name",
+                        "tag": "customer",
                         "validate": "string",
                         "error_message": "Invalid name entered. Please try again."
                     }
@@ -228,6 +228,8 @@ menu = {
                 "roles": ["admin"],
                 "route": "/users/role",
                 "method": "PATCH",
+                "route": "/users/role",
+                "method": "PATCH",
                 "inputs": [
                     {
                         "prompt": "Enter username of the user to change role",
@@ -237,7 +239,7 @@ menu = {
                     },
                     {
                         "prompt": "Enter new role (customer, scheduler, admin)",
-                        "tag": "new_role",
+                        "tag": "role",
                         "validate": "enum",
                         "options": ["customer", "scheduler", "admin"],
                         "error_message": "Invalid role. Please select from customer, scheduler, admin."
@@ -453,11 +455,15 @@ class CLI:
         '''
         command = command_index
         data = {}
-        for input_def in command.get("inputs",[]):
+        call_method = command["method"].lower()
+        for input_def in command["inputs"]:
             user_input = self.prompt_input(input_def)
             if user_input is None:  # User typed 'exit'
                 return
-            data[input_def["tag"]] = urllib.parse.quote(user_input)
+            if call_method == 'get' or call_method == 'delete':
+                data[input_def["tag"]] = urllib.parse.quote(user_input)
+            else:
+                data[input_def["tag"]] = user_input
 
 
         response = self.api_handler.make_request(command, data)

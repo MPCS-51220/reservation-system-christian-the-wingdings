@@ -16,17 +16,21 @@ class User(BaseModel):
     role: Optional[str] = None
     salt: Optional[str] = None
 
-class Reservation(BaseModel):
+class Reservation_Req(BaseModel):
     id: Optional[int] = None
     customer: str
-    machine: Machine
-    start_date: datetime
-    end_date: datetime
+    machine: str
+    start_date: str
+    end_date: str
     total_cost: Optional[float] = None
     down_payment: Optional[float] = None
     
 class CancelledReservation(BaseModel):
     id: int
-    reservation: Reservation
+    reservation: Reservation_Req
     timestamp: datetime
     refund: float
+
+class UserRole(BaseModel):
+    username: str
+    role: str

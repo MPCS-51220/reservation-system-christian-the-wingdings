@@ -5,10 +5,7 @@ import urllib.parse
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
-from schema import Reservation, User
-import sqlite3
-from datetime import datetime
-
+from schema import Reservation_Req, User, UserRole
 
 
 
@@ -94,7 +91,7 @@ add_reservation_permissions = {
 @validate_user
 @role_required(add_user_permissions)
 def add_reservation(request: Request,
-                    reservation_request: Reservation):
+                    reservation_request: Reservation_Req):
     """
     This endpoints attempts to add a reservation with a particular
     customer name, machine, start date and end date. It returns a
@@ -103,20 +100,17 @@ def add_reservation(request: Request,
     """
    
     try:
-        user_manager = UserManager
+
+        user_manager = UserManager()
         if not user_manager.is_user_active(reservation_request.customer_name) \
         or not user_manager.is_user_active(request.state.user):
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
-            
 
-        start = urllib.parse.unquote(reservation_request.start_date)
-        end = urllib.parse.unquote(reservation_request.end_date)
+        reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
+        reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
 
-
-        reservation_date = DateRange(start, end)
-        reservation = Reservation(reservation_request.customer_name, reservation_request.machine_name, reservation_date)
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
    
@@ -268,7 +262,7 @@ async def cancel_reservation(request: Request,
 
 
 del_user_permissions = {
-    "admin": None,  # No additional checks needed for admin
+    "admin": None  # No additional checks needed for admin
 }
 @app.delete("/users", status_code=status.HTTP_200_OK)
 @validate_user
@@ -294,18 +288,18 @@ async def remove_user(request: Request,
 
 
 patch_user_role_permissions = {
-    "admin": None,
-    "scheduler": None,
-}
+    "admin": None
+    }
 @app.patch("/users/role", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
-                           username: str = Query(..., description="user to patch"),
-                           new_role: str = Query(..., description="new role for user")):
+
+                           role_request: UserRole):
     try:
-        calendar.update_user_role(new_role, username)
-        return {"message": f"{username} role changed to {new_role} successfully"}
+        print(role_request.role, role_request.username)
+        calendar.update_user_role(role_request.role, role_request.username)
+        return {"message": f"{role_request.username} role changed to {role_request.role} successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to update user role due to {e}')

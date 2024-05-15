@@ -374,14 +374,6 @@ class ReservationCalendar:
         
         return final_reservations
     
-    def add_reservation(self, reservation, is_test=False):
-        if not is_test:
-            self._verify_business_hours(reservation)
-            self._check_equipment_availability(reservation)
-            self.reservations[reservation.id] = reservation
-        else:
-            self.reservations[reservation.id] = reservation
-    
     def remove_reservation(self, reservation_id):
         if reservation_id in self.reservations:
             reservation = self.reservations[reservation_id]
