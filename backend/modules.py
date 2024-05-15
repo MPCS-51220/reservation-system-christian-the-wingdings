@@ -118,13 +118,11 @@ class UserManager:
     def is_user_active(self, username):
         """Check if a user is active"""
         try:
-            print("i came here")
             conn = sqlite3.connect('../reservationDB.db')
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
             user = cursor.fetchone()
-            print("user",user)
             if user and user['is_active']:
                 return True
             return False
@@ -368,11 +366,9 @@ class ReservationCalendar:
         return False
     
     def add_reservation(self, reservation):
-        print("came hereee 1")
+
         self._verify_business_hours(reservation)
-        print("came hereee 2")
         self._check_equipment_availability(reservation)
-        print("came hereee 3")
 
         try:
             conn = self.get_db()
@@ -499,7 +495,6 @@ class ReservationCalendar:
     def _check_equipment_availability(self, reservation):
 
         overlapping_reservations = self.retrieve_by_date(reservation.daterange)
-        print(overlapping_reservations)
 
         # Count how many scanners, harvesters, and scoopers are reserved in the overlapping period
         scanner_count = 0

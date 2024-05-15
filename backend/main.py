@@ -5,7 +5,7 @@ import urllib.parse
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
-from schema import Reservation_Req, User, UserRole
+from schema import Reservation_Req, User, UserRole, Activation
 
 
 
@@ -100,17 +100,16 @@ async def add_reservation(request: Request,
     """
    
     try:
-        print("i am HERE")
+      
         user_manager = UserManager()
         if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user):
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
-        print("again here")
 
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
         reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
-        print("again here again")
+
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
    
@@ -143,9 +142,6 @@ async def get_reservations_by_customer(request: Request,
     """
     if customer is None:
         customer = request.state.user
-
-    print("Cust: ,",customer)
-
 
     try:
         if start_date and end_date:
@@ -289,7 +285,6 @@ patch_user_role_permissions = {
 @validate_user
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
-
                            role_request: UserRole):
     try:
         print(role_request.role, role_request.username)
@@ -337,13 +332,13 @@ deactivate_activate_permissions={
 @app.patch("/users/deactivate", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-async def deactivate_user(request: Request, username: str = Query(..., description="user to deactivate")):
+async def deactivate_user(request: Request, user_request: Activation):
 
 
     try:
         user_manager = UserManager()
-        user_manager.deactivate_user(username)
-        return {"message": f"User {username} has been deactivated."}
+        user_manager.deactivate_user(user_request.username)
+        return {"message": f"User {user_request.username} has been deactivated."}
    
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -354,13 +349,13 @@ async def deactivate_user(request: Request, username: str = Query(..., descripti
 @app.patch("/users/activate", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-async def activate_user(request: Request, username: str = Query(..., description="user to activate")):
+async def activate_user(request: Request, user_request: Activation):
 
 
     try:
         user_manager = UserManager()
-        user_manager.activate_user(username)
-        return {"message": f"User {username} has been activated."}
+        user_manager.activate_user(user_request.username)
+        return {"message": f"User {user_request.username} has been activated."}
    
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -377,7 +372,6 @@ async def list_users(request: Request):
 
     try:
         user_manager = UserManager()
-        print("before calling modules")
         users = user_manager.list_users()
         return {"users": users}
    

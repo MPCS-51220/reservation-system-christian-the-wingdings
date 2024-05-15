@@ -228,8 +228,6 @@ menu = {
                 "roles": ["admin"],
                 "route": "/users/role",
                 "method": "PATCH",
-                "route": "/users/role",
-                "method": "PATCH",
                 "inputs": [
                     {
                         "prompt": "Enter username of the user to change role",
@@ -347,7 +345,7 @@ class APIHandler:
         call_method = command["method"].lower()
        
         try:
-            if call_method == 'get' or call_method == 'delete' or call_method == "patch":
+            if call_method == 'get' or call_method == 'delete':
                 response = method(f'{self.base_url}{command["route"]}', params=data, headers=headers)
             else:
                 response = method(f'{self.base_url}{command["route"]}', json=data, headers=headers)
