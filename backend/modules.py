@@ -357,13 +357,6 @@ class ReservationCalendar:
         
         return final_reservations
     
-    def remove_reservation(self, reservation_id):
-        if reservation_id in self.reservations:
-            reservation = self.reservations[reservation_id]
-            refund = reservation.calculate_refund()
-            del self.reservations[reservation_id]
-            return refund
-        return False
     
     def add_reservation(self, reservation):
 
