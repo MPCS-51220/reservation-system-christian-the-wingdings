@@ -4,7 +4,7 @@ import urllib.parse
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
-from schema import Reservation_Req, User
+from schema import Reservation_Req, User, UserRole
 
 
 app = FastAPI()
@@ -192,7 +192,7 @@ async def cancel_reservation(request: Request,
 
 
 del_user_permissions = {
-    "admin": None,  # No additional checks needed for admin
+    "admin": None  # No additional checks needed for admin
 }
 @app.delete("/users", status_code=status.HTTP_200_OK)
 @validate_user
@@ -212,18 +212,17 @@ async def remove_user(request: Request,
 
 
 patch_user_role_permissions = {
-    "admin": None,
-    "scheduler": None,
-}
+    "admin": None
+    }
 @app.patch("/users/role", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
-                           username: str = Query(..., description="user to patch"),
-                           role: str = Query(..., description="new role for user")):
+                           role_request: UserRole):
     try:
-        calendar.update_user_role(role, username)
-        return {"message": f"{username} role changed to {role} successfully"}
+        print(role_request.role, role_request.username)
+        calendar.update_user_role(role_request.role, role_request.username)
+        return {"message": f"{role_request.username} role changed to {role_request.role} successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')

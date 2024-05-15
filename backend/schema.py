@@ -30,3 +30,7 @@ class CancelledReservation(BaseModel):
     reservation: Reservation_Req
     timestamp: datetime
     refund: float
+
+class UserRole(BaseModel):
+    username: str
+    role: str

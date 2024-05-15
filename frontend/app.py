@@ -222,8 +222,8 @@ menu = {
             {
                 "name": "Change user role",
                 "roles": ["admin"],
-                "route": "/users",
-                "method": "POST",
+                "route": "/users/role",
+                "method": "PATCH",
                 "inputs": [
                     {
                         "prompt": "Enter username of the user to change role",
@@ -233,7 +233,7 @@ menu = {
                     },
                     {
                         "prompt": "Enter new role (customer, scheduler, admin)",
-                        "tag": "new_role",
+                        "tag": "role",
                         "validate": "enum",
                         "options": ["customer", "scheduler", "admin"],
                         "error_message": "Invalid role. Please select from customer, scheduler, admin."
