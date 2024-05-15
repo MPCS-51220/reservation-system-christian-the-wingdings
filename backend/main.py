@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, status, Request, Query, Depends
 import urllib.parse
 
+
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
@@ -9,13 +10,17 @@ import sqlite3
 from datetime import datetime
 
 
+
+
 app = FastAPI()
 calendar = ReservationCalendar()
 
 
+
+
 # def log_operation(username, type, description, timestamp):
-#     """ 
-#     Logs user operations to the database 
+#     """
+#     Logs user operations to the database
 #     """
 #     try:
 #         timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
@@ -30,12 +35,15 @@ calendar = ReservationCalendar()
 #             cursor.execute(query, (user_id, type, description, timestamp))
 #             conn.commit()
 
+
 #     except sqlite3.Error as e:
 #         print("Failed to log operation: ", str(e))
+
 
 @app.get("/")
 def root():
     return {"message": "Hello World"}
+
 
 @app.post("/login")
 async def login(userlog: User, user_manager: UserManager = Depends()):
@@ -48,6 +56,7 @@ async def login(userlog: User, user_manager: UserManager = Depends()):
 #    log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
    return {"access_token": access_token, "token_type": "bearer"}
 
+
 add_user_permissions = {
     "admin": None
 }
@@ -57,24 +66,29 @@ add_user_permissions = {
 async def add_user(request: Request,
                    user_request: User):
 
+
     user_manager = UserManager()
     try:
-        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)   
-        log_operation() 
+        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)  
+        # log_operation()
         return {"message": f'{user_request.username} added successfully'}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add user due to {e}')
 
 
+
+
 def is_customer_accessing_own_data(user_username, customer_name):
     return user_username == customer_name
+
 
 add_reservation_permissions = {
     "admin": None,  # No additional checks needed for admin
     "scheduler": None,  # No additional checks needed for scheduler
     "customer": is_customer_accessing_own_data  # Customers can only access their own data
 }
+
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
 @validate_user
@@ -83,23 +97,38 @@ def add_reservation(request: Request,
                     reservation_request: Reservation):
     """
     This endpoints attempts to add a reservation with a particular
-    customer name, machine, start date and end date. It returns a 
+    customer name, machine, start date and end date. It returns a
     status code of 201 if the reservation was made successfully or
     a status code of 500 if there was an error
     """
-    
+   
     try:
+        user_manager = UserManager
+        if not user_manager.is_user_active(reservation_request.customer_name) \
+        or not user_manager.is_user_active(request.state.user):
+            # reservation cannot be made by/for deactivated users
+            raise HTTPException(status_code=400, 
+                                detail="This user is deactivated and cannot make reservations.")
+            
+
         start = urllib.parse.unquote(reservation_request.start_date)
         end = urllib.parse.unquote(reservation_request.end_date)
+
 
         reservation_date = DateRange(start, end)
         reservation = Reservation(reservation_request.customer_name, reservation_request.machine_name, reservation_date)
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
-    
+   
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
+
+
+
+
+
+
 
 
 
@@ -112,11 +141,12 @@ get_reservation_permissions = {
     "customer": is_customer_accessing_own_data
 }
 
+
 @app.get("/reservations/customers", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(get_reservation_permissions)
 async def get_reservations_by_customer(request: Request,
-                                      customer_name: str = None, 
+                                      customer_name: str = None,
                                       start_date: str = Query(..., description="Start date of the reservation period"),
                                       end_date: str = Query(..., description="End date of the reservation period")):
     """
@@ -127,25 +157,32 @@ async def get_reservations_by_customer(request: Request,
     if customer_name is None:
         customer_name = request.state.user
 
+
     try:
         if start_date and end_date:
            
             start = urllib.parse.unquote(start_date)
             end = urllib.parse.unquote(end_date)
 
+
             daterange = DateRange(start, end)
             reservations = calendar.retrieve_by_customer(daterange, customer_name)
         else:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        
+       
         if reservations:
             return {"reservations":reservations}
         else:
             return {"message": "No reservations found for this customer."}
-        
+       
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to get reservations due to {e}')
+
+
+
+
+
 
 
 
@@ -157,11 +194,12 @@ get_reservation_by_machine_permissions = {
     "customer": is_customer_accessing_own_data
 }
 
+
 @app.get("/reservations/machines", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(get_reservation_by_machine_permissions)
 async def get_reservations_by_machine(request: Request,
-                                machine: str, 
+                                machine: str,
                                 start_date: str = Query(..., description="Start date of the reservation period"),
                                 end_date: str = Query(..., description="End date of the reservation period")):
     """
@@ -174,19 +212,25 @@ async def get_reservations_by_machine(request: Request,
             start = urllib.parse.unquote(start_date)
             end = urllib.parse.unquote(end_date)
 
+
             daterange = DateRange(start, end)
             reservations = calendar.retrieve_by_machine(daterange, machine)
         else:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        
+       
         if reservations:
             return {"reservations":reservations}
         else:
             return {"message": "No reservations found for this machine."}
-        
+       
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to get reservations due to {e}')
+
+
+
+
+
 
 
 
@@ -198,13 +242,14 @@ del_reservation_permissions = {
     "customer": is_customer_accessing_own_data
 }
 
+
 @app.delete("/reservations", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(del_reservation_permissions)
 async def cancel_reservation(request: Request,
                              reservation_id: str):
     """
-    This endpoint attempts to cancel a reservation. If no 
+    This endpoint attempts to cancel a reservation. If no
     such reservation is found, a status code 404 is returned.
     """
     try:
@@ -212,10 +257,13 @@ async def cancel_reservation(request: Request,
         if refund is not False: # reservation was removed and refund amount returned
             return {"message": "Reservation cancelled successfully", "refund": refund}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Reservation not found") 
+                    detail="Reservation not found")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
+
+
+
 
 
 
@@ -231,9 +279,15 @@ async def remove_user(request: Request,
         calendar.remove_user(username)
         return {"message": f"{username} deleted successfully"}
 
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to delete user due to {e}')
+
+
+
+
+
 
 
 
@@ -248,13 +302,17 @@ patch_user_role_permissions = {
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
                            username: str = Query(..., description="user to patch"),
-                           role: str = Query(..., description="new role for user")):
+                           new_role: str = Query(..., description="new role for user")):
     try:
-        calendar.update_user_role(role, username)
-        return {"message": f"{username} role changed to {role} successfully"}
+        calendar.update_user_role(new_role, username)
+        return {"message": f"{username} role changed to {new_role} successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to update user role due to {e}')
+
+
+
+
 
 
 
@@ -264,6 +322,7 @@ patch_user_password_permissions = {
     "scheduler": None,
     "customer": is_customer_accessing_own_data
 }
+
 @app.patch("/users/password", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(patch_user_password_permissions)
@@ -273,59 +332,69 @@ def update_user_password(request: Request,
         UserManager.update_password(user_request.username, user_request.password, user_request.salt)
         return {"message": f"password for {user_request.username} was changed successfully"}
 
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to update password due to {e}')
+
+
 
 
 deactivate_activate_permissions={
     "admin":None
 }
 
+
 @app.patch("/users/deactivate", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-def deactivate_user(username: str = Query(..., description="user to deactivate")):
+async def deactivate_user(request: Request, username: str = Query(..., description="user to deactivate")):
+
 
     try:
         user_manager = UserManager()
         user_manager.deactivate_user(username)
         return {"message": f"User {username} has been deactivated."}
-    
+   
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to deactivate user due to {e}')
-    
+   
+
 
 @app.patch("/users/activate", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-def activate_user(username: str = Query(..., description="user to activate")):
+async def activate_user(request: Request, username: str = Query(..., description="user to activate")):
+
 
     try:
         user_manager = UserManager()
         user_manager.activate_user(username)
         return {"message": f"User {username} has been activated."}
-    
+   
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to activate user due to {e}')
 
 
+
+
 @app.get("/users", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-def list_users():
+async def list_users(request: Request):
+
 
     try:
         user_manager = UserManager()
+        print("before calling modules")
         users = user_manager.list_users()
         return {"users": users}
-    
+   
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to list users due to {e}')
-    
+   
 
-    
 

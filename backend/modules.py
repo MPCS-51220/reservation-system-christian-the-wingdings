@@ -113,6 +113,41 @@ class UserManager:
         except sqlite3.Error as e:
             print("Database error: ",str(e))
             raise e
+        
+    # def can_make_reservation(self, username, customer_name):
+    #     """Check if the user is active and the customer is active"""
+        
+    #     try:
+    #         conn = sqlite3.connect('../reservationDB.db')
+    #         conn.row_factory = sqlite3.Row
+    #         cursor = conn.cursor()
+    #         cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
+    #         user = cursor.fetchone()
+    #         cursor.execute("SELECT is_active FROM User WHERE username = ?",(customer_name,))
+    #         customer = cursor.fetchone()
+    #         if user and user['is_active'] and customer and customer['is_active']:
+    #             return True
+    #         return False
+        
+    #     except sqlite3.Error as e:
+    #         print("Database error: ",str(e))
+    #         raise e
+
+    def is_user_active(self, username):
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
+            user = cursor.fetchone()
+            if user and user['is_active']:
+                return True
+            return False
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+
 
 
 

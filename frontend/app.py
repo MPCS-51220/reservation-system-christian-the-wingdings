@@ -1,7 +1,11 @@
+
+
+
 import requests
 from requests.exceptions import RequestException
 import urllib.parse
-from functools import wraps 
+from functools import wraps
+
 
 # This dictionary is to be refactored into a command validating class and the dictionary text, so the later can be
 # kept on the server with only valid commands per role being returned to the client for display.
@@ -35,7 +39,7 @@ menu = {
                 "inputs": [
                     {
                         "prompt": "Enter start date (YYYY-MM-DD HH:MM)",
-                        "tag": "start_date",
+                        "start_date": "start_date",
                         "validate": "datetime",
                         "error_message": "Invalid date format or past date entered. Please try again."
                     },
@@ -64,7 +68,7 @@ menu = {
             {
                 "name": "Cancel reservation",
                 "roles": ["admin", "scheduler", "customer"],
-                "route": "/reservation",
+                "route": "/reservations",
                 "method": "DELETE",
                 "inputs": [
                     {
@@ -222,8 +226,8 @@ menu = {
             {
                 "name": "Change user role",
                 "roles": ["admin"],
-                "route": "/users",
-                "method": "POST",
+                "route": "/users/role",
+                "method": "PATCH",
                 "inputs": [
                     {
                         "prompt": "Enter username of the user to change role",
@@ -243,8 +247,8 @@ menu = {
             {
                 "name": "Reset Password",
                 "roles": ["admin"],
-                "route": "/reset-password",
-                "method": "POST",
+                "route": "/users/password",
+                "method": "PATCH",
                 "inputs": [
                     {
                         "prompt": "Enter username for password reset",
@@ -253,19 +257,58 @@ menu = {
                         "error_message": "Invalid username. Please try again."
                     }
                 ]
+            },
+             {
+                "name": "Deactivate user",
+                "roles": ["admin"],
+                "route": "/users/deactivate",
+                "method": "PATCH",
+                "inputs": [
+                    {
+                        "prompt": "Enter username to deactivate",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid username. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "Activate user",
+                "roles": ["admin"],
+                "route": "/users/activate",
+                "method": "PATCH",
+                "inputs": [
+                    {
+                        "prompt": "Enter username to activate",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid username. Please try again."
+                    }
+                ]
+            },
+            {
+                "name": "List activation state of users",
+                "roles": ["admin"],
+                "route": "/users",
+                "method": "GET",
             }
+
+
         ]
     }
+
+
 
 
 class APIHandler:
     '''
     This class is responsible for making requests to the backend API.
 
+
     Attributes:
         base_url (str): The base URL of the API.
         headers (dict): The headers to be sent with each request.
-    
+   
     Methods:
         set_token(token): Sets the token in the headers for authorization once recieved from logging in
         make_request(command, data): Makes a request to the API with the given command (from menu) and data (from user input).
@@ -274,21 +317,24 @@ class APIHandler:
         self.base_url = base_url
         self.headers = {}
 
+
     def set_token(self, token):
         self.headers['Authorization'] = f'Bearer {token}'
+
 
     def make_request(self, command, data):
         '''
         make_request makes a request to the API with the given command and data.
-        
+       
         Args:
-            command (dict): The command to be executed from the menu. 
+            command (dict): The command to be executed from the menu.
         Formatted { name: str,
                     roles: list,
-                    route: str, 
-                    method: str, 
+                    route: str,
+                    method: str,
                     inputs: list of dicts }
         data (dict): The data to be sent with the request. Formatted { tag: value }.
+
 
         Returns:
             JSON: The response from the API as a JSON object.
@@ -296,18 +342,19 @@ class APIHandler:
         headers = self.headers
         method = getattr(requests, command["method"].lower(), requests.post)
         call_method = command["method"].lower()
-        
+       
         try:
-            if call_method == 'get' or call_method == 'delete':
+            if call_method == 'get' or call_method == 'delete' or call_method == "patch":
                 response = method(f'{self.base_url}{command["route"]}', params=data, headers=headers)
             else:
                 response = method(f'{self.base_url}{command["route"]}', json=data, headers=headers)
             response.raise_for_status()  # Raises an HTTPError for bad responses
             return response.json()      
-        
+       
         except RequestException as e:
             print(f"Request failed: {e}")
             return None
+
 
 def retry_input(input_def):
     '''
@@ -316,7 +363,7 @@ def retry_input(input_def):
     Args:
         input_def (dict): Formatted: {  prompt: str,
                                         tag: str,
-                                        validate: function, 
+                                        validate: function,
                                         error_message: str }
     '''
     def decorator(func):
@@ -334,14 +381,16 @@ def retry_input(input_def):
         return wrapper
     return decorator
 
+
 class CLI:
     '''
     This class is responsible for handling the command line interface for the user.
 
+
     Attributes:
         api_handler (APIHandler): The APIHandler object for making requests to the backend.
         is_active (bool): A flag to determine if the CLI is still active.
-    
+   
     Methods:
         select_command(): Prompts the user to select a command from the menu dictionary
         run(): Runs the CLI and prompts the user for input of command index until the user types 'exit'
@@ -350,10 +399,12 @@ class CLI:
         self.api_handler = api_handler
         self.is_active = True
 
+
     # @retry_input({"prompt": "Select a command or type 'exit' to quit: ", "validate": lambda x: x.isdigit()})
     def select_command(self):
         '''
         select_command prompts the user to select a command from the menu dictionary.
+
 
         Returns:
             int: The index of the selected command in the menu dictionary.
@@ -367,9 +418,12 @@ class CLI:
             print("Invalid selection, please try again.")
 
 
+
+
     def run(self):
         '''
         run runs the CLI and prompts the user for input of command index until the user types 'exit'.
+
 
         '''
         while self.is_active:
@@ -383,17 +437,19 @@ class CLI:
             selected_command = menu["commands"][command_index]
             self.handle_prompt(selected_command)
 
+
     def handle_prompt(self, command_index):
         '''
-        handle_prompt prompts the user for input based on the selected command's input requirements 
+        handle_prompt prompts the user for input based on the selected command's input requirements
         and sends the data to the API.
+
 
         Args:
             command_index (int): The index of the selected command in the menu dictionary.
-        
+       
         returns:
             None: If the user types 'exit' during the prompt.
-            
+           
         '''
         command = command_index
         data = {}
@@ -403,10 +459,13 @@ class CLI:
                 return
             data[input_def["tag"]] = urllib.parse.quote(user_input)
 
+
         response = self.api_handler.make_request(command, data)
         if command["name"] == "Login" and response:
             self.api_handler.set_token(response['access_token'])
         print("Response:", response if response else "Failed to get a valid response from the server.")
+
+
 
 
     @retry_input({"prompt": "Select a command or type 'exit' to quit: ", "validate": lambda x: x.isdigit()})
@@ -414,8 +473,10 @@ class CLI:
         '''
         select_command takes the user response to select a command from the menu dictionary.
 
+
         Args:
             user_input (str): string representation of int to select a command from the menu dictionary.
+
 
         Returns:
             int: _description_
@@ -425,6 +486,7 @@ class CLI:
             return command_index
         print("Invalid selection, please try again.")
         return None
+
 
     # @retry_input({"prompt": "", "validate": lambda x: True})  # Placeholder for actual validation logic
     def prompt_input(self, input_def):
@@ -437,8 +499,12 @@ class CLI:
             print(input_def["error_message"])
 
 
+
+
 # Main execution
 if __name__ == "__main__":
     api_handler = APIHandler('http://localhost:8000')
     cli = CLI(api_handler)
     cli.run()
+
+
