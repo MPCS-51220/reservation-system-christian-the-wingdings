@@ -4,7 +4,7 @@ import urllib.parse
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
-from schema import Reservation, User
+from schema import Reservation_Req, User
 
 
 app = FastAPI()
@@ -55,20 +55,18 @@ add_reservation_permissions = {
 @validate_user
 @role_required(add_user_permissions)
 def add_reservation(request: Request,
-                    reservation_request: Reservation):
+                    reservation_request: Reservation_Req):
     """
     This endpoints attempts to add a reservation with a particular
     customer name, machine, start date and end date. It returns a 
     status code of 201 if the reservation was made successfully or
     a status code of 500 if there was an error
     """
+    print(reservation_request)
     
     try:
-        start = urllib.parse.unquote(reservation_request.start_date)
-        end = urllib.parse.unquote(reservation_request.end_date)
-
-        reservation_date = DateRange(start, end)
-        reservation = Reservation(reservation_request.customer_name, reservation_request.machine_name, reservation_date)
+        reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
+        reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
         calendar.add_reservation(reservation)
         return {"message": "Reservation added successfully!"}
     
