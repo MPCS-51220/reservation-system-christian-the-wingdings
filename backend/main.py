@@ -62,7 +62,6 @@ def add_reservation(request: Request,
     status code of 201 if the reservation was made successfully or
     a status code of 500 if there was an error
     """
-    print(reservation_request)
     
     try:
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
