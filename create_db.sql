@@ -8,7 +8,7 @@ CREATE TABLE Machine (
 
 
 CREATE TABLE Reservation (
-    reservation_id INTEGER PRIMARY KEY,
+    reservation_id INTEGER PRIMARY KEY AUTO,
     customer TEXT NOT NULL,
     machine_id INTEGER NOT NULL,
     start_date DATETIME NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE Reservation (
 );
 
 CREATE TABLE User (
-    user_id INTEGER PRIMARY KEY,
+    user_id INTEGER PRIMARY KEY AUTO,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE User (
 );
 
 CREATE TABLE Operation (
-    operation_id INTEGER PRIMARY KEY,
+    operation_id INTEGER PRIMARY KEY AUTO,
     user_id INTEGER NOT NULL,
     timestamp DATETIME NOT NULL,
     type TEXT NOT NULL,
@@ -45,5 +45,3 @@ INSERT INTO Machine (machine_id, name, quantity, cooldown, rate) VALUES
 
 INSERT INTO Machine (machine_id, name, quantity, cooldown, rate) VALUES
 (3, 'harvester', 1, 360, 88000.0);
-
-
