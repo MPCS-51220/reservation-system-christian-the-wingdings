@@ -1,7 +1,10 @@
-# T-02: Pay Off Debt, Strengthen the Foundation, Persist Data, Track Users
+# T-03: Station 13 Facility Management
 
 ## Overview
-For this assignment, your team will work together to improve last week's iteration.  The work in this iteration is focussed on making your design and tests more robust, implementing a robust (well, at least somewhat robust) persistence layer, and setting up user roles and passwords. The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663327
+This assignment allows your team to select some of the feature your team will implement from a backlog.
+Basic requirements must be implemented/completed.
+Backlog requirements are each worth specific number of points. 
+The difficulty of the backlog requirements varies. The number of points assigned to each is loose guide of expected difficulty for a typical team, but may not be a perfect indicator for your team, so think through them and decide. The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663328
 
 
 # Equipment Reservation System Documentation
@@ -19,6 +22,7 @@ Welcome to the Equipment Reservation System! This system is designed to help use
 - [T-02 Security Discussion](#t-02-security-discussion)
 - [New Features](#new-features)
 - [Database System](#database-system)
+- [T-03 Feature Points](#t-03-feature-points)
 - [Contributing](#contributing)
 
 
@@ -235,6 +239,27 @@ description: description of the operation performed
 one-to-many connection from Machine to Reservation
 
 one-to-many connection from User to Operations
+
+
+## T-03 Feature Points
+
+### Configurable Business Rules (5 points)
+
+We added an admin command on the frontend that allows the user to set particular values related to Reservations and logistics. Once the frontend rule and value are specified, an API request is made to the backend to change those values in the code. Then, the admin can set the following values in the code:
+
+harvester_price \
+scooper_price_per_hour \
+scanner_price_per_hour \
+number_of_scoopers \
+number_of_scanners \
+weekday_start \
+weekday_end \
+weekdend_start \
+weekend_end \
+week_refund \
+two_day_refund
+
+Once these changes go through, these changes are generally updated for the entire system. Note that reservations created at certain prices will retain their original prices, but can get updated refund percentages based on their original down payment.
 
 
 ## Contributing
