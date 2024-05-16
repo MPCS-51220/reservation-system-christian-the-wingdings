@@ -142,7 +142,16 @@ pytest
 
 When loading the database from our repository, there starts some example in the tables of reservationDB. 
 
-For the user, there is a user with username 'johndoe' and password 'hashed_password_example'. It is an admin user, so it can used to create new users for additional testing.
+List of users and passwords:
+username: akshatha
+password: akshatha
+role: admin
+username: graham
+password: graham
+role: scheduler
+username: Adam
+password: Adam
+role: customer
 
 
  Note: When a password is reset or a new user is created, their temporary password is set to 'temp'. When a user with this password tries to login, they will be prompted to change their password from 'temp', as that password is deemed unsecure with a specific salt I set in the system.
