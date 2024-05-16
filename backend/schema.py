@@ -38,3 +38,6 @@ class CancelledReservation(BaseModel):
 class UserRole(BaseModel):
     username: str
     role: str
+
+class Activation(BaseModel):
+    username:str

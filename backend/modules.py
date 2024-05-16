@@ -73,7 +73,65 @@ class UserManager:
         except sqlite3.Error as e:
             print("Database error: ",str(e))
             raise e
-            
+        
+    def deactivate_user(self, username):
+        """Deactivate a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET is_active = ? WHERE username = ?", (0, username))
+                conn.commit()
+
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+    def activate_user(self, username):
+        """Activate a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET is_active = ? WHERE username = ?", (1, username))
+                conn.commit()
+                
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+    def list_users(self):
+        """List users with activation state"""
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, is_active FROM User")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+
+    def is_user_active(self, username):
+        """Check if a user is active"""
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
+            user = cursor.fetchone()
+            if user and user['is_active']:
+                return True
+            return False
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+
+
+
+
 
 
 
@@ -278,7 +336,7 @@ class ReservationCalendar:
             cursor.execute(query, (customer, end, start))
             rows = cursor.fetchall()
             conn.close()
-            print(f"Rows: {rows}")
+            # print(f"Rows: {rows}")
             return [dict(row) for row in rows] 
         
         except sqlite3.Error as e:
@@ -306,6 +364,7 @@ class ReservationCalendar:
         return False
     
     def add_reservation(self, reservation):
+
         self._verify_business_hours(reservation)
         self._check_equipment_availability(reservation)
 
@@ -319,11 +378,11 @@ class ReservationCalendar:
                 raise ValueError("Machine not found")
 
             query = """
-            INSERT INTO Reservation (reservation_id, customer, machine_id, 
+            INSERT INTO Reservation (customer, machine_id, 
             start_date, end_date, total_cost, down_payment) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """
-            cursor.execute(query,(reservation.id, reservation.customer, machine_id[0],
+            cursor.execute(query,(reservation.customer, machine_id[0],
                                     reservation.daterange.start_date, reservation.daterange.end_date,
                                     reservation.cost, reservation.down_payment))
             conn.commit()
