@@ -44,6 +44,7 @@ def root():
     return {"message": "Hello World"}
 
 
+
 @app.post("/login")
 async def login(userlog: UserLogin, user_manager: UserManager = Depends()):
     try:
@@ -66,6 +67,7 @@ async def login(userlog: UserLogin, user_manager: UserManager = Depends()):
         # Raise a generic HTTPException with status code 500
         raise HTTPException(status_code=500, detail="Internal Server Error")
         
+
 
 add_user_permissions = {
     "admin": None

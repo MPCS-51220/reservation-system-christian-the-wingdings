@@ -249,6 +249,7 @@ one-to-many connection from User to Operations
 
 ## T-03 Feature Points
 
+<<<<<<< HEAD
 
 ### Login Feature through token (15 points)
 
@@ -256,6 +257,8 @@ Upon starting the application, the user will be provided first with a login prom
 
 Permissions are constructed through a dictionary to the '@role_required' wrapper with the key:value mapping being associated to the 'user_role': 'function with logic for additional constraints or None'. If a user_role is not allowed to access the route, then it is left out of the permissions dictionary.
 
+=======
+>>>>>>> 955ba7b1416a5a07411eacb43fe77820dbe4fcc8
 ### Configurable Business Rules (5 points)
 
 We added an admin command on the frontend that allows the user to set particular values related to Reservations and logistics. Once the frontend rule and value are specified, an API request is made to the backend to change those values in the code. Then, the admin can set the following values in the code:
