@@ -5,8 +5,7 @@ import urllib.parse
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, DateRange
 from token_manager import create_access_token
-from schema import Reservation_Req, User, UserRole, Activation
-
+from schema import Reservation_Req, User, UserRole, UserLogin, Activation
 
 
 app = FastAPI()
@@ -43,7 +42,7 @@ def root():
 
 
 @app.post("/login")
-async def login(userlog: User, user_manager: UserManager = Depends()):
+async def login(userlog: UserLogin, user_manager: UserManager = Depends()):
    user = user_manager.authenticate_user(userlog.username, userlog.password)
    if not user:
        raise HTTPException(status_code=401, detail="Incorrect username or password")
@@ -287,7 +286,6 @@ patch_user_role_permissions = {
 async def update_user_role(request: Request,
                            role_request: UserRole):
     try:
-        print(role_request.role, role_request.username)
         calendar.update_user_role(role_request.role, role_request.username)
         return {"message": f"{role_request.username} role changed to {role_request.role} successfully"}
     except Exception as e:
@@ -303,7 +301,6 @@ async def update_user_role(request: Request,
 
 patch_user_password_permissions = {
     "admin": None,
-    "scheduler": None,
     "customer": is_customer_accessing_own_data
 }
 
@@ -313,6 +310,9 @@ patch_user_password_permissions = {
 def update_user_password(request: Request,
                          user_request: User):
     try:
+        if request.state.role == "customer":
+            user_request.username = request.state.user
+
         UserManager.update_password(user_request.username, user_request.password, user_request.salt)
         return {"message": f"password for {user_request.username} was changed successfully"}
 

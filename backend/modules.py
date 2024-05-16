@@ -21,33 +21,31 @@ class UserManager:
         authenticate_user(username, password): Authenticates a user using a username and password.
         update_password(username, password, salt): Updates a user's password in the database.
     '''
-    
-    def __init__(self):
-        self.db_path = '../reservationDB.db'
+
+    def __init__(self, db_connection=None):
+        self.db_connection = db_connection or sqlite3.connect('../reservationDB.db', check_same_thread=False)
+        print(f"Database connection established at: {self.db_connection}")
 
     def add_user(self, username, password, role, salt):
         
         password_hash = self.hash_password(password, salt)  
-        with sqlite3.connect(self.db_path) as conn:
+        with self.db_connection as conn:
             cursor = conn.cursor()
             cursor.execute("INSERT INTO User (username, password_hash, role, salt) VALUES (?, ?, ?, ?)", (username, password_hash, role, salt))
             conn.commit()
 
     def hash_password(self, password, salt):
-        print("Type of password:", type(password))
-        print("Type of salt:", type(salt))
         return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
     def get_user(self, username):
         """Retrieve user details from the database."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT username, password_hash, role, salt FROM User WHERE username = ?", (username,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return {"username": row[0], "password_hash": row[1], "role": row[2], "salt": row[3]}
-        return None
+        with self.db_connection as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, password_hash, role, salt FROM User WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            if row:
+                return {"username": row[0], "password_hash": row[1], "role": row[2], "salt": row[3]}
+            return None
 
     def verify_password(self, plain_password, password_hash, salt):
         """Verify a plaintext password against the hashed version."""
@@ -67,7 +65,7 @@ class UserManager:
         """Update a user's password in the database."""
         password_hash = self.hash_password(password, salt)
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self.db_connection as conn:
                 cursor = conn.cursor()
                 cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", (password_hash, salt, username))
                 conn.commit()
