@@ -57,7 +57,7 @@ configure_biz_rules_permissions = {
 @app.post("/business-rules")
 @validate_user
 @role_required(configure_biz_rules_permissions)
-def configure_business_rules(request: Request,
+async def configure_business_rules(request: Request,
                              bizRule: BusinessRule):
     rule = bizRule.rule
     value = bizRule.value
