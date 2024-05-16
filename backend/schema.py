@@ -9,9 +9,13 @@ class Machine(BaseModel):
     quantity: str
     cooldown: float
     rate: bool
-    
-class User(BaseModel):
+
+class UserLogin(BaseModel):
     username: str
+    password: str
+        
+class User(BaseModel):
+    username: Optional[str] = None
     password: str
     role: Optional[str] = None
     salt: Optional[str] = None
@@ -38,3 +42,6 @@ class UserRole(BaseModel):
 class BusinessRule(BaseModel):
     rule: str
     value: str
+
+class Activation(BaseModel):
+    username:str

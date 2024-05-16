@@ -21,33 +21,31 @@ class UserManager:
         authenticate_user(username, password): Authenticates a user using a username and password.
         update_password(username, password, salt): Updates a user's password in the database.
     '''
-    
-    def __init__(self):
-        self.db_path = '../reservationDB.db'
+
+    def __init__(self, db_connection=None):
+        self.db_connection = db_connection or sqlite3.connect('../reservationDB.db', check_same_thread=False)
+        print(f"Database connection established at: {self.db_connection}")
 
     def add_user(self, username, password, role, salt):
         
         password_hash = self.hash_password(password, salt)  
-        with sqlite3.connect(self.db_path) as conn:
+        with self.db_connection as conn:
             cursor = conn.cursor()
             cursor.execute("INSERT INTO User (username, password_hash, role, salt) VALUES (?, ?, ?, ?)", (username, password_hash, role, salt))
             conn.commit()
 
     def hash_password(self, password, salt):
-        print("Type of password:", type(password))
-        print("Type of salt:", type(salt))
         return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
     def get_user(self, username):
         """Retrieve user details from the database."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT username, password_hash, role, salt FROM User WHERE username = ?", (username,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return {"username": row[0], "password_hash": row[1], "role": row[2], "salt": row[3]}
-        return None
+        with self.db_connection as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, password_hash, role, salt FROM User WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            if row:
+                return {"username": row[0], "password_hash": row[1], "role": row[2], "salt": row[3]}
+            return None
 
     def verify_password(self, plain_password, password_hash, salt):
         """Verify a plaintext password against the hashed version."""
@@ -67,7 +65,7 @@ class UserManager:
         """Update a user's password in the database."""
         password_hash = self.hash_password(password, salt)
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self.db_connection as conn:
                 cursor = conn.cursor()
                 cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", (password_hash, salt, username))
                 conn.commit()
@@ -75,7 +73,65 @@ class UserManager:
         except sqlite3.Error as e:
             print("Database error: ",str(e))
             raise e
-            
+        
+    def deactivate_user(self, username):
+        """Deactivate a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET is_active = ? WHERE username = ?", (0, username))
+                conn.commit()
+
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+    def activate_user(self, username):
+        """Activate a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE User SET is_active = ? WHERE username = ?", (1, username))
+                conn.commit()
+                
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+    def list_users(self):
+        """List users with activation state"""
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, is_active FROM User")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+        
+
+    def is_user_active(self, username):
+        """Check if a user is active"""
+        try:
+            conn = sqlite3.connect('../reservationDB.db')
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_active FROM User WHERE username = ?",(username,))
+            user = cursor.fetchone()
+            if user and user['is_active']:
+                return True
+            return False
+        
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise e
+
+
+
+
 
 
 
@@ -309,7 +365,7 @@ class ReservationCalendar:
             cursor.execute(query, (customer, end, start))
             rows = cursor.fetchall()
             conn.close()
-            print(f"Rows: {rows}")
+            # print(f"Rows: {rows}")
             return [dict(row) for row in rows] 
         
         except sqlite3.Error as e:
@@ -328,15 +384,9 @@ class ReservationCalendar:
         
         return final_reservations
     
-    def remove_reservation(self, reservation_id):
-        if reservation_id in self.reservations:
-            reservation = self.reservations[reservation_id]
-            refund = reservation.calculate_refund()
-            del self.reservations[reservation_id]
-            return refund
-        return False
     
     def add_reservation(self, reservation):
+
         self._verify_business_hours(reservation)
         self._check_equipment_availability(reservation)
 
@@ -350,11 +400,11 @@ class ReservationCalendar:
                 raise ValueError("Machine not found")
 
             query = """
-            INSERT INTO Reservation (reservation_id, customer, machine_id, 
+            INSERT INTO Reservation (customer, machine_id, 
             start_date, end_date, total_cost, down_payment) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """
-            cursor.execute(query,(reservation.id, reservation.customer, machine_id[0],
+            cursor.execute(query,(reservation.customer, machine_id[0],
                                     reservation.daterange.start_date, reservation.daterange.end_date,
                                     reservation.cost, reservation.down_payment))
             conn.commit()
