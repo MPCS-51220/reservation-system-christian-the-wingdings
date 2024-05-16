@@ -217,6 +217,8 @@ role: (admin, customer, scheduler)
 
 salt: unique salt for password
 
+is_active: specifies if the user is activated or deactivated
+
 
 ### Operation
 
@@ -260,6 +262,12 @@ week_refund \
 two_day_refund
 
 Once these changes go through, these changes are generally updated for the entire system. Note that reservations created at certain prices will retain their original prices, but can get updated refund percentages based on their original down payment.
+
+
+### Client activation management (5 points)
+
+An admin can execute a command from the frontend that either deactivates a user, activates a user or lists all users with their activation state. An API endpoint has been specified to perform each of these tasks. The user's activation state is stored and modified in the database. A deactivated user cannot make a reservation or have a reservation made on their behalf.
+
 
 
 ## Contributing
