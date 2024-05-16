@@ -1,7 +1,10 @@
-# T-02: Pay Off Debt, Strengthen the Foundation, Persist Data, Track Users
+# T-03: Station 13 Facility Management
 
 ## Overview
-For this assignment, your team will work together to improve last week's iteration.  The work in this iteration is focussed on making your design and tests more robust, implementing a robust (well, at least somewhat robust) persistence layer, and setting up user roles and passwords. The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663327
+This assignment allows your team to select some of the feature your team will implement from a backlog.
+Basic requirements must be implemented/completed.
+Backlog requirements are each worth specific number of points. 
+The difficulty of the backlog requirements varies. The number of points assigned to each is loose guide of expected difficulty for a typical team, but may not be a perfect indicator for your team, so think through them and decide. The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663328
 
 
 # Equipment Reservation System Documentation
@@ -19,6 +22,7 @@ Welcome to the Equipment Reservation System! This system is designed to help use
 - [T-02 Security Discussion](#t-02-security-discussion)
 - [New Features](#new-features)
 - [Database System](#database-system)
+- [T-03 Feature Points](#t-03-feature-points)
 - [Contributing](#contributing)
 
 
@@ -59,6 +63,7 @@ It is crucial for the system to have sqlite installed so data can be appropriate
 
 ```bash
 pip install fastapi uvicorn requests
+pip install python-jose
 ```
 
 ### Setup the Backend Server:
@@ -89,6 +94,12 @@ BASE_URL = "http://localhost:8000"
 
 The Equipment Reservation System is accessed through a command-line interface. Below are the commands and instructions on how to use them.
 
+### Logging-in
+    Select 'Log in' by entering 1 from the main menu.
+    Enter the required details:(username, password)
+    On successful login you will recieve a jwt which will be used to authenticate the routes you have access to
+
+
 ### Making a Reservation
 
     Select 'Make reservation' by entering 1 from the main menu.
@@ -110,9 +121,7 @@ The Equipment Reservation System is accessed through a command-line interface. B
 
 ### Exiting the System
 
-    Select 'Quit' by entering 4 from the main menu.
-    Choose whether to save changes (if applicable).
-*NOTE: calendar object will be saved as calendar.pkl in the main repo directory*
+    Typing 'Exit' at any point will exit your current command. If you are viewing the main menu this will close the system
 
 
 ## Running Tests
@@ -138,11 +147,13 @@ For the user, there is a user with username 'johndoe' and password 'hashed_passw
 
  Note: When a password is reset or a new user is created, their temporary password is set to 'temp'. When a user with this password tries to login, they will be prompted to change their password from 'temp', as that password is deemed unsecure with a specific salt I set in the system.
 
-## T-02 Security Discussion
+## T-03 Security Discussion
 
-Our implementation has some security assumptions. We pass hashes between the backend and frontend pretty easily, and it definitely is not the most secure method. The front end and server are not encrypted, but we are assuming that it would be in a more fleshed-out implementation. Additionally, the role is a pretty easy variable to set in the code, and there is no protection to make sure it does not change (unless an admin changes it). This can be problematic because there are definitely ways to exploit our global variables in a way to give users too much permission.
+Our implementation has some security assumptions. The front end and server is not encrypted, but we are assuming that it would be in a more fleshed-out implementation. Therefore, we are currently passing the users password directly through a POST route. This is a security concern.
 
-Lastly, we were working on but did not fully complete a version with tokens for extra security on the user. Currently, we trust that when a user logs in that they are who they say they are when working with the backend. We do think there are additional security measures we could use.
+Authorization happens through a login route which creates a jwt with a life span set to 15 min. This is automatically applied to the header of any requests from the user after they log in.
+
+Lastly, we are currently refactoring the program to push all the content displayed to the user, ie the main menu and command options, to the backend. We are currently using a dictionary in the cli file. Once we push this to the backend, we will serve only the menu options that a user has access to execute.
 
 
 ## New Features
@@ -157,9 +168,6 @@ Test data is stored in a separate databse (reservationDB) so testing is separate
     
 We use try-catch along with resetting users to previous inputs in the case of bad user input and bad endpoints.
 
-### Login Feature
-
-Upon starting the application, the user will be provided first with a login prompt where they enter credentials. If they provide a proper username and password combination, they are logged in as a user and given functionality depending on their role in the system. Customers have basic functionality for scheduling, cancelling, and viewing equiptment, but only for their own data. Schedulers have customer functionality for all data. Admin have total access to users and can change their roles and reset passwords.
 
 ## Database System
 
@@ -213,6 +221,8 @@ role: (admin, customer, scheduler)
 
 salt: unique salt for password
 
+is_active: specifies if the user is activated or deactivated
+
 
 ### Operation
 
@@ -235,6 +245,40 @@ description: description of the operation performed
 one-to-many connection from Machine to Reservation
 
 one-to-many connection from User to Operations
+
+
+## T-03 Feature Points
+
+
+### Login Feature through token (15 points)
+
+Upon starting the application, the user will be provided first with a login prompt where they enter credentials. If they provide a proper username and password combination, they are logged in as a user and given functionality depending on their role in the system. This is instantiated through a jwt token which is automatically passed in the header of every api-call from the user and permissions are instantiated based on the user's 'role' which is encoded in the system. Each route other than log in checks for valid login through the '@validate_user' wrapper and makes sure that the authenticated user is inline with the permissions associated with the route through the @role_required wrapper'. 
+
+Permissions are constructed through a dictionary to the '@role_required' wrapper with the key:value mapping being associated to the 'user_role': 'function with logic for additional constraints or None'. If a user_role is not allowed to access the route, then it is left out of the permissions dictionary.
+
+### Configurable Business Rules (5 points)
+
+We added an admin command on the frontend that allows the user to set particular values related to Reservations and logistics. Once the frontend rule and value are specified, an API request is made to the backend to change those values in the code. Then, the admin can set the following values in the code:
+
+harvester_price \
+scooper_price_per_hour \
+scanner_price_per_hour \
+number_of_scoopers \
+number_of_scanners \
+weekday_start \
+weekday_end \
+weekdend_start \
+weekend_end \
+week_refund \
+two_day_refund
+
+Once these changes go through, these changes are generally updated for the entire system. Note that reservations created at certain prices will retain their original prices, but can get updated refund percentages based on their original down payment.
+
+
+### Client activation management (5 points)
+
+An admin can execute a command from the frontend that either deactivates a user, activates a user or lists all users with their activation state. An API endpoint has been specified to perform each of these tasks. The user's activation state is stored and modified in the database. A deactivated user cannot make a reservation or have a reservation made on their behalf.
+
 
 
 ## Contributing
