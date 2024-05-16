@@ -144,21 +144,28 @@ menu = {
             },
             {
                 "name": "Change My Password",
-                "roles": ["admin", "scheduler", "customer"],
-                "route": "/change-password",
-                "method": "POST",
+                "roles": ["admin", "customer"],
+                "route": "/users/password",
+                "method": "PATCH",
                 "inputs": [
                     {
-                        "prompt": "Enter your old password",
-                        "tag": "old_password",
+                        "prompt": "Enter the username of the user you would like to change the password for",
+                        "tag": "username",
+                        "roles": ["admin"],
+                        "validate": "string",
+                        "error_message": "Invalid string format. Please try again."
+                    },
+                    {
+                        "prompt": "Enter your new password",
+                        "tag": "password",
                         "validate": "password",
                         "error_message": "Invalid password format. Please try again."
                     },
                     {
-                        "prompt": "Enter your new password",
-                        "tag": "new_password",
-                        "validate": "password",
-                        "error_message": "Invalid password format. Please try again."
+                        "prompt": "Enter a salt",
+                        "tag": "salt",
+                        "validate": "string",
+                        "error_message": "Invalid salt format. Please try again."
                     }
                 ]
             },
@@ -296,7 +303,6 @@ class APIHandler:
         headers = self.headers
         method = getattr(requests, command["method"].lower(), requests.post)
         call_method = command["method"].lower()
-        print(f'data = {data}')
         try:
             if call_method == 'get' or call_method == 'delete':
                 response = method(f'{self.base_url}{command["route"]}', params=data, headers=headers)
@@ -323,7 +329,6 @@ def retry_input(input_def):
         @wraps(func)
         def wrapper(*args, **kwargs):
             while True:
-                print(f'wrapper running and input_def = {input_def}\n')
                 user_input = input(input_def["prompt"])
                 if user_input.lower() == 'exit':
                     return None
