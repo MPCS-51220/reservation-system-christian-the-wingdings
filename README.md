@@ -19,7 +19,7 @@ Welcome to the Equipment Reservation System! This system is designed to help use
 - [Usage](#usage)
 - [Running Tests](#running-tests)
 - [Passwords for Sample Users](#passwords-for-sample-users)
-- [T-02 Security Discussion](#t-02-security-discussion)
+- [T-03 Security Discussion](#t-02-security-discussion)
 - [New Features](#new-features)
 - [Database System](#database-system)
 - [T-03 Feature Points](#t-03-feature-points)

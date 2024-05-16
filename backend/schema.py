@@ -38,3 +38,10 @@ class CancelledReservation(BaseModel):
 class UserRole(BaseModel):
     username: str
     role: str
+
+class BusinessRule(BaseModel):
+    rule: str
+    value: str
+
+class Activation(BaseModel):
+    username:str
