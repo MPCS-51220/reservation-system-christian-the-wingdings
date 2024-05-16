@@ -142,16 +142,16 @@ pytest
 
 When loading the database from our repository, there starts some example in the tables of reservationDB. 
 
-List of users and passwords:
-username: akshatha
-password: akshatha
-role: admin
-username: graham
-password: graham
-role: scheduler
-username: Adam
-password: Adam
-role: customer
+List of users and passwords: \
+username: akshatha \
+password: akshatha \
+role: admin \
+username: graham \
+password: graham \
+role: scheduler \
+username: Adam \
+password: Adam \
+role: customer \
 
 
  Note: When a password is reset or a new user is created, their temporary password is set to 'temp'. When a user with this password tries to login, they will be prompted to change their password from 'temp', as that password is deemed unsecure with a specific salt I set in the system.
