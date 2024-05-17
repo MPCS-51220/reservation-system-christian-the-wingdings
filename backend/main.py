@@ -54,6 +54,7 @@ async def login(userlog: UserLogin, user_manager: UserManager = Depends()):
         access_token = create_access_token(data={"sub": user['username'],
                                                     "role": user['role']
                                                     })
+        print(f"user: {user['username']}, role: {user['role']} logged in")
         log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
         return {"access_token": access_token, "token_type": "bearer"}
     
@@ -135,7 +136,7 @@ add_reservation_permissions = {
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
 @validate_user
-@role_required(add_user_permissions)
+@role_required(add_reservation_permissions)
 async def add_reservation(request: Request,
                     reservation_request: Reservation_Req):
     """
@@ -167,9 +168,6 @@ async def add_reservation(request: Request,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
-
-def is_customer_accessing_own_data(user_username, customer_name):
-    return user_username == customer_name
 
 
 

@@ -63,10 +63,12 @@ def role_required(roles_permissions: dict):
             request = kwargs.get('request')
             role = request.state.role
             user = request.state.user
-            if role in roles_permissions:
-                condition = roles_permissions[role]
-                if condition is None or condition(user *args, **kwargs):
-                    return await f(*args, **kwargs)
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+            try:
+                if role in roles_permissions.keys():
+                    condition = roles_permissions[role]
+                    if condition is None or condition(user *args, **kwargs):
+                        return await f(*args, **kwargs)
+            except Exception as e:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
         return wrapper
     return decorator

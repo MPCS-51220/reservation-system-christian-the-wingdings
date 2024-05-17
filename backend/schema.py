@@ -22,7 +22,7 @@ class User(BaseModel):
 
 class Reservation_Req(BaseModel):
     id: Optional[int] = None
-    customer: str
+    customer: Optional[str] = None
     machine: str
     start_date: str
     end_date: str
