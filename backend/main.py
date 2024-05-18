@@ -5,14 +5,14 @@ from datetime import datetime
 
 
 from permissions import validate_user, role_required
-from modules import Reservation, ReservationCalendar, UserManager, DateRange
+from modules import Reservation, ReservationCalendar, UserManager, BusinessManager, DateRange
 from token_manager import create_access_token
 
 from schema import Reservation_Req, User, UserRole, UserLogin, Activation, BusinessRule
 
 
 app = FastAPI()
-calendar = ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5)
+calendar = ReservationCalendar()
 
 
 
@@ -99,8 +99,11 @@ configure_biz_rules_permissions = {
 @role_required(configure_biz_rules_permissions)
 async def configure_business_rules(request: Request,
                              bizRule: BusinessRule):
+    
+    bizManager = BusinessManager()
     rule = bizRule.rule
     value = bizRule.value
+    
     update_data = {rule: value}
     origVal = update_data[rule]
     
@@ -108,16 +111,19 @@ async def configure_business_rules(request: Request,
         float_value = float(value)
 
         if float_value.is_integer():
-            update_data[rule] = int(float_value)
+            #update_data[rule] = int(float_value)
+            value = int(float_value)
         else:
-            update_data[rule] = float_value
+            #update_data[rule] = float_value
+            value = float_value
     except ValueError:
-        update_data[rule] = origVal
+        #update_data[rule] = origVal
+        value = origVal
 
     try:
 
-
-        calendar.update_settings(**update_data)    
+        bizManager.update_rule(rule, value) 
+        #calendar.update_settings(**update_data)  
         return {"message": f'business rules updated successfully'}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -146,16 +152,13 @@ async def add_reservation(request: Request,
     """
    
     try:
-      
         user_manager = UserManager()
         if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user):
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
-
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
         reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
-
         calendar.add_reservation(reservation)
         log_operation(request.state.user, 
                       "add reservation", 
@@ -196,14 +199,17 @@ async def get_reservations_by_customer(request: Request,
         customer = request.state.user
 
     try:
+        print("1")
         if start_date and end_date:
-           
+            print("2")
             start = urllib.parse.unquote(start_date)
             end = urllib.parse.unquote(end_date)
-
+            print("3")
 
             daterange = DateRange(start, end)
+            print("4")
             reservations = calendar.retrieve_by_customer(daterange, customer)
+            print("5")
         else:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
         log_operation(request.state.user,

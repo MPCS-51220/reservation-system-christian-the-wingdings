@@ -130,7 +130,33 @@ class UserManager:
             raise e
 
 
+class BusinessManager:
+    def __init__(self):
+        self.conn = sqlite3.connect('../reservationDB.db')
+        self.cursor = self.conn.cursor()
 
+    def get_rule(self, field_name):
+        try:
+            self.cursor.execute(f"SELECT {field_name} FROM BusinessRules LIMIT 1")
+            result = self.cursor.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+            return None
+
+    def update_rule(self, field_name, value):
+        try:
+            self.cursor.execute(f"UPDATE BusinessRules SET {field_name} = ? WHERE rowid = 1", (value,))
+            self.conn.commit()
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+            self.conn.rollback()
+
+    def __del__(self):
+        self.conn.close()
 
 
 
@@ -156,26 +182,26 @@ class Reservation:
         calculate_down_payment(): Calculates the required down payment.
         calculate_refund(): Calculates the refund for a cancelled reservation
     '''
-    def __init__(self, customer_name, machine_name, daterange, harvester_price, scooper_price_per_hour, scanner_price_per_hour):
+    def __init__(self, customer_name, machine_name, daterange):
         self.id = str(uuid.uuid4())
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
+        self.biz_manager = BusinessManager()
         self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
 
-        self.harvester_price = harvester_price
-        self.scooper_price_per_hour = scooper_price_per_hour
-        self.scanner_price_per_hour = scanner_price_per_hour
+        #self.harvester_price = harvester_price
+        #self.scooper_price_per_hour = scooper_price_per_hour
+        #self.scanner_price_per_hour = scanner_price_per_hour
 
     def calculate_cost(self):
-
         if self.machine == "harvester":
-            return self.harvester_price #88000 # explicit cost for harvester as defined in the requirements
+            return self.biz_manager.get_rule("harvester_price") #88000 # explicit cost for harvester as defined in the requirements
         if self.machine == "scooper": 
-            return self.daterange.hours() * self.scooper_price_per_hour #1000 # cost per hour for scooper as defined in the requirements
+            return self.daterange.hours() * self.biz_manager.get_rule("scooper_price_per_hour") #1000 # cost per hour for scooper as defined in the requirements
         if self.machine == "scanner":    
-            return self.daterange.hours() * self.scanner_price_per_hour #990 # cost per hour for scanner as defined in the requirements
+            return self.daterange.hours() * self.biz_manager.get_rule("scanner_price_per_hour") #990 # cost per hour for scanner as defined in the requirements
 
     def calculate_discount(self):
         # Early bird discount of 25% if reservation is made more than 13 days in advance
@@ -188,14 +214,15 @@ class Reservation:
         return self.cost * 0.5
 
 
-def calculate_refund(start_date, down_payment, week_refund, two_day_refund):
+def calculate_refund(start_date, down_payment):
     # calculate refund based on number of advance days of cancellation
+    biz_manager = BusinessManager()
     start_date = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
     advance_days = (start_date - datetime.now()).days
     if advance_days >= 7:
-        refund = week_refund * down_payment # 0.75 * down_payment
+        refund = biz_manager.get_rule("week_refund") * down_payment # 0.75 * down_payment
     elif advance_days >= 2:
-        refund = two_day_refund * down_payment # 0.5 * down_payment
+        refund = biz_manager.get_rule("two_day_refund") * down_payment # 0.5 * down_payment
     else:
         refund = 0
     return refund
@@ -219,21 +246,23 @@ class ReservationCalendar:
         save_reservations(): Saves current reservations to a data source.
     '''
 
-    def __init__(self, harvester_price, scooper_price_per_hour, scanner_price_per_hour, number_of_scoopers, number_of_scanners, weekday_start, weekday_end, weekdend_start, weekend_end, week_refund, two_day_refund):
+    def __init__(self):
         #self.reservations = {}
-        self.harvester_price = harvester_price
-        self.scooper_price_per_hour = scooper_price_per_hour
-        self.scanner_price_per_hour = scanner_price_per_hour
-        self.number_of_scoopers = number_of_scoopers
-        self.number_of_scanners = number_of_scanners
-        self.weekday_start = weekday_start
-        self.weekday_end = weekday_end
-        self.weekend_start = weekdend_start
-        self.weekend_end = weekend_end
-        self.week_refund = week_refund
-        self.two_day_refund = two_day_refund
+        #self.harvester_price = harvester_price
+        #self.scooper_price_per_hour = scooper_price_per_hour
+        #self.scanner_price_per_hour = scanner_price_per_hour
+        #self.number_of_scoopers = number_of_scoopers
+        #self.number_of_scanners = number_of_scanners
+        #self.weekday_start = weekday_start
+        #self.weekday_end = weekday_end
+        #self.weekend_start = weekdend_start
+        #self.weekend_end = weekend_end
+        #self.week_refund = week_refund
+        #self.two_day_refund = two_day_refund
 
-    def update_settings(self, **kwargs):
+        self.biz_manager = BusinessManager()
+
+    '''def update_settings(self, **kwargs):
         """
         Updates the settings of the reservation calendar dynamically.
         Accepted kwargs: harvester_price, scooper_price_per_hour, scanner_price_per_hour,
@@ -243,7 +272,7 @@ class ReservationCalendar:
             if hasattr(self, key):
                 setattr(self, key, value)
             else:
-                raise AttributeError(f"'ReservationCalendar' object has no attribute '{key}'")
+                raise AttributeError(f"'ReservationCalendar' object has no attribute '{key}'")'''
 
     def get_db(self):
         """
@@ -477,7 +506,7 @@ class ReservationCalendar:
             if row: # check if reservation exists
                 start_date = row[0]
                 down_payment = row[1]
-                refund = calculate_refund(start_date, down_payment, self.week_refund, self.two_day_refund)
+                refund = calculate_refund(start_date, down_payment)
                 query = "DELETE FROM Reservation WHERE reservation_id = ?"
                 cursor.execute(query,(reservation_id,))
                 conn.commit()
@@ -495,17 +524,22 @@ class ReservationCalendar:
             raise ValueError("Reservations cannot be made on Sundays.")
 
         # Check Saturday hours
+        weekday_start = self.biz_manager.get_rule("weekday_start")
+        weekday_end = self.biz_manager.get_rule("weekday_end")
+        weekend_start = self.biz_manager.get_rule("weekend_start")
+        weekend_end = self.biz_manager.get_rule("weekend_end")
+
         if reservation.daterange.start_date.weekday() == 5:
-            if (reservation.daterange.start_date.time() > datetime.strptime(self.weekend_end, "%H:%M").time() or #"16:00"
-                reservation.daterange.end_date.time() > datetime.strptime(self.weekend_end, "%H:%M").time() or #"16:00"
-                reservation.daterange.start_date.time() < datetime.strptime(self.weekend_start, "%H:%M").time() or #"10:00"
-                reservation.daterange.end_date.time() < datetime.strptime(self.weekend_start, "%H:%M").time()): #"10:00"
+            if (reservation.daterange.start_date.time() > datetime.strptime(weekend_end, "%H:%M").time() or #"16:00"
+                reservation.daterange.end_date.time() > datetime.strptime(weekend_end, "%H:%M").time() or #"16:00"
+                reservation.daterange.start_date.time() < datetime.strptime(weekend_start, "%H:%M").time() or #"10:00"
+                reservation.daterange.end_date.time() < datetime.strptime(weekend_start, "%H:%M").time()): #"10:00"
                 raise ValueError("Reservations on Saturdays must be between 10:00 and 16:00.")
 
         # Check weekday hours
         if reservation.daterange.start_date.weekday() < 5:
-            if (reservation.daterange.start_date.time() < datetime.strptime(self.weekday_start, "%H:%M").time() or #"9:00"
-                reservation.daterange.end_date.time() > datetime.strptime(self.weekday_end, "%H:%M").time()): #"18:00"
+            if (reservation.daterange.start_date.time() < datetime.strptime(weekday_start, "%H:%M").time() or #"9:00"
+                reservation.daterange.end_date.time() > datetime.strptime(weekday_end, "%H:%M").time()): #"18:00"
                 raise ValueError("Reservations on weekdays must be between 9:00 and 18:00.")
 
         # Check if the reservation is more than 30 days in advance
@@ -531,7 +565,7 @@ class ReservationCalendar:
 
         # Check constraints for scanners
         if reservation.machine == "scanner":
-            if scanner_count >= self.number_of_scanners: #3
+            if scanner_count >= self.biz_manager.get_rule("number_of_scanners"): #3
                 raise ValueError("Maximum number of scanners already reserved for this time period.")
             if harvester_reserved:
                 raise ValueError("Scanners cannot operate while the harvester is in use.")
@@ -545,7 +579,7 @@ class ReservationCalendar:
 
         # Check constraints for scoopers
         if reservation.machine == "scooper":
-            if scooper_count >= self.number_of_scoopers:  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
+            if scooper_count >= self.biz_manager.get_rule("number_of_scoopers"):  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
                 raise ValueError("Only one scooper must remain available; maximum number already reserved.")
 
         # General check for other machines (if more types are added in the future)
