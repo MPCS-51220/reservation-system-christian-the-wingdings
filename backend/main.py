@@ -5,24 +5,42 @@ from datetime import datetime
 
 
 from permissions import validate_user, role_required
-from modules import Reservation, ReservationCalendar, UserManager, DateRange
+from modules import Reservation, ReservationCalendar, UserManager, DateRange, DatabaseManager
 from token_manager import create_access_token
 
 from schema import Reservation_Req, User, UserRole, UserLogin, Activation, BusinessRule
 
 
 app = FastAPI()
-calendar = ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5)
+# calendar = ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5)
 
 
+def get_db_manager():
+    return DatabaseManager('../reservationDB.db')
+
+def get_user_manager(db_manager: DatabaseManager = Depends(get_db_manager)):
+    return UserManager(db_manager)
+
+def get_calendar(db_manager: DatabaseManager = Depends(get_db_manager)):
+    return ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5, db_manager)
 
 
+# async def log_operation(username, type, description, timestamp, db_manager: DatabaseManager = Depends(get_db_manager)):
 def log_operation(username, type, description, timestamp):
     """
     Logs user operations to the database
     """
     try:
         timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        # print(f'25, username: {username}, type: {type}, description: {description}, timestamp: {timestamp}')
+        # print(f'27, db: {db_manager}')
+        # id_query = f"SELECT user_id FROM USER WHERE username = ?"
+        # id = db_manager.execute_query(id_query, (username,))
+        # insert_query = """INSERT INTO Operation (user_id, type, description, timestamp)
+        #                 VALUES (?, ?, ?, ?)"""
+        # print(f'32, id: {id}, id[0]: {id[0]} insert_query: {insert_query}')
+        # db_manager.execute_query(insert_query, (id[0], type, description, timestamp))
+        
         with sqlite3.connect('../reservationDB.db') as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT user_id FROM USER WHERE username = ?",(username,))
@@ -45,8 +63,9 @@ def root():
 
 
 
+
 @app.post("/login")
-async def login(userlog: UserLogin, user_manager: UserManager = Depends()):
+async def login(userlog: UserLogin, user_manager: UserManager = Depends(get_user_manager)):
     try:
         user = user_manager.authenticate_user(userlog.username, userlog.password)
         if not user:
@@ -71,16 +90,15 @@ async def login(userlog: UserLogin, user_manager: UserManager = Depends()):
 
 
 add_user_permissions = {
-    "admin": None
+    "admin": None,
 }
 @app.post("/users")
 @validate_user
 @role_required(add_user_permissions)
 async def add_user(request: Request,
-                   user_request: User):
+                   user_request: User,
+                   user_manager: UserManager = Depends(get_user_manager)):
 
-
-    user_manager = UserManager()
     try:
         user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)  
         log_operation(request.state.user, "add user", f"{user_request.username} user added", datetime.now())
@@ -138,25 +156,23 @@ add_reservation_permissions = {
 @validate_user
 @role_required(add_reservation_permissions)
 async def add_reservation(request: Request,
-                    reservation_request: Reservation_Req):
+                            reservation_request: Reservation_Req,
+                            user_manager: UserManager = Depends(get_user_manager),
+                            calendar: ReservationCalendar = Depends(get_calendar)):
     """
     This endpoints attempts to add a reservation with a particular
     customer name, machine, start date and end date. It returns a
     status code of 201 if the reservation was made successfully or
     a status code of 500 if there was an error
     """
-   
-    try:
-      
-        user_manager = UserManager()
-        if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user):
+    try:      
+        if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user): #Need to come back to. 
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
 
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
         reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
-
         calendar.add_reservation(reservation)
         log_operation(request.state.user, 
                       "add reservation", 
@@ -173,26 +189,22 @@ async def add_reservation(request: Request,
 
 get_reservation_permissions = {
     "admin": None,
-    "scheduler": None,
-    "customer": is_customer_accessing_own_data
+    "scheduler": None
 }
-
 
 @app.get("/reservations/customers", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(get_reservation_permissions)
 async def get_reservations_by_customer(request: Request,
-                                      customer: str = None,
+                                      customer: str = Query(..., description="Customer name"),
                                       start_date: str = Query(..., description="Start date of the reservation period"),
-                                      end_date: str = Query(..., description="End date of the reservation period")):
+                                      end_date: str = Query(..., description="End date of the reservation period"),
+                                      calendar: ReservationCalendar = Depends(get_calendar)):
     """
     This endpoint retrieves the reservations made by a customer
     in a particular date range. It returns an appropriate message
     if no such reservations are found.
     """
-    if customer is None:
-        customer = request.state.user
-
     try:
         if start_date and end_date:
            
@@ -238,9 +250,11 @@ get_reservation_by_machine_permissions = {
 @validate_user
 @role_required(get_reservation_by_machine_permissions)
 async def get_reservations_by_machine(request: Request,
-                                machine: str,
+                                machine: str = Query(..., description="Machine to get records for"),
                                 start_date: str = Query(..., description="Start date of the reservation period"),
-                                end_date: str = Query(..., description="End date of the reservation period")):
+                                end_date: str = Query(..., description="End date of the reservation period"),
+                                calendar: ReservationCalendar = Depends(get_calendar)):
+
     """
     This endpoint retrieves the reservations made for a machine
     in a particular date range. It returns an appropriate message
@@ -250,8 +264,6 @@ async def get_reservations_by_machine(request: Request,
         if start_date and end_date:
             start = urllib.parse.unquote(start_date)
             end = urllib.parse.unquote(end_date)
-
-
             daterange = DateRange(start, end)
             reservations = calendar.retrieve_by_machine(daterange, machine)
         else:
@@ -291,13 +303,16 @@ del_reservation_permissions = {
 @validate_user
 @role_required(del_reservation_permissions)
 async def cancel_reservation(request: Request,
-                             reservation_id: str):
+                             reservation_id: str = Query(..., description="Reservation ID"),
+                             calendar: ReservationCalendar = Depends(get_calendar)):
     """
     This endpoint attempts to cancel a reservation. If no
     such reservation is found, a status code 404 is returned.
     """
     try:
+        print('cancel reservation try block')
         refund = calendar.remove_reservation(reservation_id)
+        print(f'refund: {refund} in cancel_reservation')
         if refund is not False: # reservation was removed and refund amount returned
             log_operation(request.state.user,
                       "cancel reservation", 
@@ -316,13 +331,14 @@ async def cancel_reservation(request: Request,
 
 
 del_user_permissions = {
-    "admin": None  # No additional checks needed for admin
+    "admin": None
 }
 @app.delete("/users", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(del_user_permissions)
 async def remove_user(request: Request,
-                      username: str):
+                      username: str = Query(..., description="Username of the user to delete"),
+                      calendar: ReservationCalendar = Depends(get_calendar)):
     try:
         calendar.remove_user(username)
         log_operation(request.state.user,
@@ -346,13 +362,15 @@ async def remove_user(request: Request,
 
 
 patch_user_role_permissions = {
-    "admin": None
+    "admin": None,
+    "scheduler": None
     }
 @app.patch("/users/role", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
-                           role_request: UserRole):
+                           role_request: UserRole,
+                           calendar: ReservationCalendar = Depends(get_calendar)):
     try:
         calendar.update_user_role(role_request.role, role_request.username)
         log_operation(request.state.user,
@@ -381,12 +399,13 @@ patch_user_password_permissions = {
 @validate_user
 @role_required(patch_user_password_permissions)
 async def update_user_password(request: Request,
-                         user_request: User):
+                         user_request: User,
+                         user_manager: UserManager = Depends(get_user_manager)):
     try:
         if request.state.role == "customer":
             user_request.username = request.state.user
 
-        UserManager.update_password(user_request.username, user_request.password, user_request.salt)
+        user_manager.update_password(user_request.username, user_request.password, user_request.salt)
         log_operation(request.state.user,
                       "change user password", 
                       f"Password changed for {user_request.username}", 
@@ -409,11 +428,10 @@ deactivate_activate_permissions={
 @app.patch("/users/deactivate", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-async def deactivate_user(request: Request, user_request: Activation):
-
-
+async def deactivate_user(request: Request,
+                          user_request: Activation,
+                          user_manager: UserManager = Depends(get_user_manager)):
     try:
-        user_manager = UserManager()
         user_manager.deactivate_user(user_request.username)
         log_operation(request.state.user,
                       "deactivate user", 
@@ -430,11 +448,11 @@ async def deactivate_user(request: Request, user_request: Activation):
 @app.patch("/users/activate", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-async def activate_user(request: Request, user_request: Activation):
-
-
+async def activate_user(request: Request,
+                        user_request: Activation,
+                        user_manager: UserManager = Depends(get_user_manager)):
+    
     try:
-        user_manager = UserManager()
         user_manager.activate_user(user_request.username)
         log_operation(request.state.user,
                       "activate user", 
@@ -452,17 +470,18 @@ async def activate_user(request: Request, user_request: Activation):
 @app.get("/users", status_code=status.HTTP_200_OK)
 @validate_user
 @role_required(deactivate_activate_permissions)
-async def list_users(request: Request):
+async def list_users(request: Request,
+                     user_manager: UserManager = Depends(get_user_manager)):
 
 
     try:
-        user_manager = UserManager()
-        users = user_manager.list_users()
+        users_status = user_manager.list_users()
+        print(f'users_status: {users_status}')
         log_operation(request.state.user,
                       "list users' status", 
                       f"Listed all users with status", 
                       datetime.now())
-        return {"users": users}
+        return {'users': users_status}
    
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
