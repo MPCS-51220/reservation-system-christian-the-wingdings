@@ -12,7 +12,6 @@ from schema import Reservation_Req, User, UserRole, UserLogin, Activation, Busin
 
 
 app = FastAPI()
-calendar = ReservationCalendar() #Note to self: This is a temporary solution. The calendar should be created in the main function and passed as a dependency to the endpoints that need it.
 
 
 def get_db_manager():
@@ -22,7 +21,11 @@ def get_user_manager(db_manager: DatabaseManager = Depends(get_db_manager)):
     return UserManager(db_manager)
 
 def get_calendar(db_manager: DatabaseManager = Depends(get_db_manager)):
-    return ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5, db_manager)
+    return ReservationCalendar(db_manager)
+
+# calendar = ReservationCalendar() #Note to self: This is a temporary solution. The calendar should be created in the main function and passed as a dependency to the endpoints that need it.
+
+
 
 
 # async def log_operation(username, type, description, timestamp, db_manager: DatabaseManager = Depends(get_db_manager)):
@@ -90,7 +93,7 @@ async def login(userlog: UserLogin, user_manager: UserManager = Depends(get_user
 
 
 add_user_permissions = {
-    "admin": None,
+    "admin": None
 }
 @app.post("/users")
 @validate_user
@@ -211,17 +214,12 @@ async def get_reservations_by_customer(request: Request,
     if no such reservations are found.
     """
     try:
-        print("1")
         if start_date and end_date:
-            print("2")
             start = urllib.parse.unquote(start_date)
             end = urllib.parse.unquote(end_date)
-            print("3")
 
             daterange = DateRange(start, end)
-            print("4")
             reservations = calendar.retrieve_by_customer(daterange, customer)
-            print("5")
         else:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
         log_operation(request.state.user,

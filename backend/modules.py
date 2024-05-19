@@ -276,15 +276,12 @@ class Reservation:
         calculate_refund(): Calculates the refund for a cancelled reservation
     '''
     def __init__(self, customer_name, machine_name, daterange):
-        self.id = str(uuid.uuid4())
-        
-        self.harvester_price = harvester_price
-        self.scooper_price_per_hour = scooper_price_per_hour
-        self.scanner_price_per_hour = scanner_price_per_hour
+        self.id = str(uuid.uuid4()) 
         
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
+        
         self.biz_manager = BusinessManager()
         self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
@@ -292,12 +289,12 @@ class Reservation:
 
     def calculate_cost(self):
         if self.machine == "harvester":
-            return self.biz_manager.get_rule("harvester_price") #88000 # explicit cost for harvester as defined in the requirements
+            return self.biz_manager.get_rule("harvester_price")
         if self.machine == "scooper": 
-            return self.daterange.hours() * self.biz_manager.get_rule("scooper_price_per_hour") #1000 # cost per hour for scooper as defined in the requirements
+            return self.daterange.hours() * self.biz_manager.get_rule("scooper_price_per_hour")
         if self.machine == "scanner":    
-            return self.daterange.hours() * self.biz_manager.get_rule("scanner_price_per_hour") #990 # cost per hour for scanner as defined in the requirements
-
+            return self.daterange.hours() * self.biz_manager.get_rule("scanner_price_per_hour")
+        
     def calculate_discount(self):
         # Early bird discount of 25% if reservation is made more than 13 days in advance
         if (self.daterange.start_date - datetime.now()).days > 13:
@@ -341,7 +338,7 @@ class ReservationCalendar:
         save_reservations(): Saves current reservations to a data source.
     '''
 
-    def __init__(self):
+    def __init__(self, DatabaseManager):
         #self.reservations = {}
         #self.harvester_price = harvester_price
         #self.scooper_price_per_hour = scooper_price_per_hour
@@ -716,28 +713,28 @@ class ReservationCalendar:
                 if res['machine_name'] == "scooper":
                     scooper_count += 1
 
-        # Check constraints for scanners
-        if reservation.machine == "scanner":
-            if scanner_count >= self.biz_manager.get_rule("number_of_scanners"): #3
-                raise ValueError("Maximum number of scanners already reserved for this time period.")
-            if harvester_reserved:
-                raise ValueError("Scanners cannot operate while the harvester is in use.")
-
-            # Check if the reservation is for a harvester and if any scanner is reserved
-            if reservation.machine == "harvester":
-                if scanner_count > 0:
-                    raise ValueError("The harvester cannot operate while scanners are in use.")
+            # Check constraints for scanners
+            if reservation.machine == "scanner":
+                if scanner_count >= self.biz_manager.get_rule("number_of_scanners"): #3
+                    raise ValueError("Maximum number of scanners already reserved for this time period.")
                 if harvester_reserved:
-                    raise ValueError("The harvester is already reserved for this time period.")
+                    raise ValueError("Scanners cannot operate while the harvester is in use.")
 
-        # Check constraints for scoopers
-        if reservation.machine == "scooper":
-            if scooper_count >= self.biz_manager.get_rule("number_of_scoopers"):  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
-                raise ValueError("Only one scooper must remain available; maximum number already reserved.")
+                # Check if the reservation is for a harvester and if any scanner is reserved
+                if reservation.machine == "harvester":
+                    if scanner_count > 0:
+                        raise ValueError("The harvester cannot operate while scanners are in use.")
+                    if harvester_reserved:
+                        raise ValueError("The harvester is already reserved for this time period.")
 
-            # General check for other machines (if more types are added in the future)
-            if reservation.machine not in ["scanner", "harvester", "scooper"]:
-                raise ValueError("Please select from one of our specified machines: scanner, harvester, scooper.")
+            # Check constraints for scoopers
+            if reservation.machine == "scooper":
+                if scooper_count >= self.biz_manager.get_rule("number_of_scoopers"):  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
+                    raise ValueError("Only one scooper must remain available; maximum number already reserved.")
+
+                # General check for other machines (if more types are added in the future)
+                if reservation.machine not in ["scanner", "harvester", "scooper"]:
+                    raise ValueError("Please select from one of our specified machines: scanner, harvester, scooper.")
         
         except sqlite3.Error as e:
             print("Database error: ",str(e))
