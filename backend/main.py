@@ -5,24 +5,27 @@ from datetime import datetime
 
 
 from permissions import validate_user, role_required
-from modules import Reservation, ReservationCalendar, UserManager, DateRange, DatabaseManager
+from modules import Reservation, ReservationCalendar, UserManager, BusinessManager, DateRange, DatabaseManager
 from token_manager import create_access_token
 
 from schema import Reservation_Req, User, UserRole, UserLogin, Activation, BusinessRule
 
 
 app = FastAPI()
-# calendar = ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5)
 
 
 def get_db_manager():
     return DatabaseManager('../reservationDB.db')
 
+def get_business_manager(db_manager: DatabaseManager = Depends(get_db_manager)):
+    return BusinessManager(db_manager)
+
 def get_user_manager(db_manager: DatabaseManager = Depends(get_db_manager)):
     return UserManager(db_manager)
 
 def get_calendar(db_manager: DatabaseManager = Depends(get_db_manager)):
-    return ReservationCalendar(88000, 1000, 990, 3, 3, "9:00", "18:00", "10:00", "16:00", 0.75, 0.5, db_manager)
+    return ReservationCalendar(db_manager)
+
 
 
 # async def log_operation(username, type, description, timestamp, db_manager: DatabaseManager = Depends(get_db_manager)):
@@ -65,7 +68,8 @@ def root():
 
 
 @app.post("/login")
-async def login(userlog: UserLogin, user_manager: UserManager = Depends(get_user_manager)):
+async def login(userlog: UserLogin,
+                user_manager: UserManager = Depends(get_user_manager)):
     try:
         user = user_manager.authenticate_user(userlog.username, userlog.password)
         if not user:
@@ -90,7 +94,7 @@ async def login(userlog: UserLogin, user_manager: UserManager = Depends(get_user
 
 
 add_user_permissions = {
-    "admin": None,
+    "admin": None
 }
 @app.post("/users")
 @validate_user
@@ -117,9 +121,12 @@ configure_biz_rules_permissions = {
 @validate_user
 @role_required(configure_biz_rules_permissions)
 async def configure_business_rules(request: Request,
-                             bizRule: BusinessRule):
+                             bizRule: BusinessRule,
+                             bizManager = Depends(get_business_manager)):
+
     rule = bizRule.rule
     value = bizRule.value
+    
     update_data = {rule: value}
     origVal = update_data[rule]
     
@@ -127,16 +134,19 @@ async def configure_business_rules(request: Request,
         float_value = float(value)
 
         if float_value.is_integer():
-            update_data[rule] = int(float_value)
+            #update_data[rule] = int(float_value)
+            value = int(float_value)
         else:
-            update_data[rule] = float_value
+            #update_data[rule] = float_value
+            value = float_value
     except ValueError:
-        update_data[rule] = origVal
+        #update_data[rule] = origVal
+        value = origVal
 
     try:
 
-
-        calendar.update_settings(**update_data)    
+        bizManager.update_rule(rule, value) 
+        #calendar.update_settings(**update_data)  
         return {"message": f'business rules updated successfully'}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -158,7 +168,8 @@ add_reservation_permissions = {
 async def add_reservation(request: Request,
                             reservation_request: Reservation_Req,
                             user_manager: UserManager = Depends(get_user_manager),
-                            calendar: ReservationCalendar = Depends(get_calendar)):
+                            calendar: ReservationCalendar = Depends(get_calendar),
+                            business_manager: BusinessManager = Depends(get_business_manager)):
     """
     This endpoints attempts to add a reservation with a particular
     customer name, machine, start date and end date. It returns a
@@ -170,9 +181,9 @@ async def add_reservation(request: Request,
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
-
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
-        reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
+        reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date, business_manager)
+
         calendar.add_reservation(reservation)
         log_operation(request.state.user, 
                       "add reservation", 
@@ -207,10 +218,8 @@ async def get_reservations_by_customer(request: Request,
     """
     try:
         if start_date and end_date:
-           
             start = urllib.parse.unquote(start_date)
             end = urllib.parse.unquote(end_date)
-
 
             daterange = DateRange(start, end)
             reservations = calendar.retrieve_by_customer(daterange, customer)
@@ -338,9 +347,9 @@ del_user_permissions = {
 @role_required(del_user_permissions)
 async def remove_user(request: Request,
                       username: str = Query(..., description="Username of the user to delete"),
-                      calendar: ReservationCalendar = Depends(get_calendar)):
+                      user_manager: UserManager = Depends(get_user_manager)):
     try:
-        calendar.remove_user(username)
+        user_manager.remove_user(username)
         log_operation(request.state.user,
                       "remove user", 
                       f"{username} user removed", 
@@ -370,9 +379,9 @@ patch_user_role_permissions = {
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
                            role_request: UserRole,
-                           calendar: ReservationCalendar = Depends(get_calendar)):
+                           user_manager: UserManager = Depends(get_user_manager)):
     try:
-        calendar.update_user_role(role_request.role, role_request.username)
+        user_manager.update_user_role(role_request.role, role_request.username)
         log_operation(request.state.user,
                       "change user role", 
                       f"{role_request.username} role changed to {role_request.role}", 
