@@ -89,7 +89,30 @@ class UserManager:
         except sqlite3.Error as e:
             print("Database error: ",str(e))
             raise e
-        
+    
+    
+    def update_user_role(self, new_role, username):
+        try:
+            query = "UPDATE User SET role = ? WHERE username = ?"
+            params = (new_role, username)
+            self.db_manager.execute_statement(query, params)
+            
+        except sqlite3.Error as e:
+            print("Database error: ", str(e))
+            raise
+    
+    def remove_user(self, username):
+
+        try:
+            query = "DELETE FROM User WHERE username = ?"
+            params = (username,)
+            self.db_manager.execute_statement(query, params)
+               
+        except sqlite3.Error as e:
+            print("Database error: ",str(e))
+            raise
+
+    
     def deactivate_user(self, username):
         """Deactivate a user"""
         try:
@@ -155,10 +178,18 @@ class DatabaseManager:
     Returns:
         _type_: _description_
     '''
+    _instance = None
 
-    def __init__(self, db_path):
-        self.db_path = db_path
-        print(f"Database Manager initialized at path: {self.db_path}")
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self, db_path='../reservationDB.db'):
+        if not hasattr(self, 'initialized'):
+            self.db_path = db_path
+            self.initialized = True
+            print(f"Database Manager initialized at path: {self.db_path}")
 
     @contextmanager
     def get_connection(self):
@@ -191,7 +222,9 @@ class DatabaseManager:
                         cursor.execute(query)
                     conn.commit()
                     rows = cursor.fetchall()
+                    print(f'Rows: {rows}')
                     if rows:
+                        print(f'Get Connection returned: {[dict(zip([column[0] for column in cursor.description], row)) for row in rows]}')
                         return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
                     return []
                 except sqlite3.Error as e:
@@ -224,33 +257,34 @@ class DatabaseManager:
 
 
 class BusinessManager:
-    def __init__(self):
-        self.conn = sqlite3.connect('../reservationDB.db')
-        self.cursor = self.conn.cursor()
+    def __init__(self, db_manager):
+        self.db_manager = db_manager
+        self.load_business_rules()
+
+    def load_business_rules(self):
+        # Get the column names from the BusinessRules table
+        query = "PRAGMA table_info(BusinessRules)"
+        column_info = self.db_manager.execute_query(query)
+        column_names = [col['name'] for col in column_info]
+
+        # Select the first row from the BusinessRules table
+        query = "SELECT * FROM BusinessRules LIMIT 1"
+        row = self.db_manager.execute_query(query)
+        
+        if row:
+            row = row[0]  # Get the first row
+            print(f'Row: {row} for load_business_rules')
+            # Create instance attributes for each column
+            for column_name in column_names:
+                setattr(self, column_name, row[column_name])
 
     def get_rule(self, field_name):
-        try:
-            self.cursor.execute(f"SELECT {field_name} FROM BusinessRules LIMIT 1")
-            result = self.cursor.fetchone()
-            if result:
-                return result[0]
-            else:
-                return None
-        except sqlite3.Error as e:
-            print(f"An error occurred: {e}")
-            return None
+        return getattr(self, field_name, None)
 
     def update_rule(self, field_name, value):
-        try:
-            self.cursor.execute(f"UPDATE BusinessRules SET {field_name} = ? WHERE rowid = 1", (value,))
-            self.conn.commit()
-        except sqlite3.Error as e:
-            print(f"An error occurred: {e}")
-            self.conn.rollback()
-
-    def __del__(self):
-        self.conn.close()
-
+        setattr(self, field_name, value)
+        query = f"UPDATE BusinessRules SET {field_name} = ? WHERE rowid = 1"
+        self.db_manager.execute_statement(query, (value,))
 
 
 
@@ -275,25 +309,24 @@ class Reservation:
         calculate_down_payment(): Calculates the required down payment.
         calculate_refund(): Calculates the refund for a cancelled reservation
     '''
-    def __init__(self, customer_name, machine_name, daterange):
+    def __init__(self, customer_name, machine_name, daterange, business_manager):
         self.id = str(uuid.uuid4()) 
-        
+        self.biz_manager = business_manager
+
         self.customer = customer_name
         self.machine = machine_name
         self.daterange = daterange
-        
-        self.biz_manager = BusinessManager()
         self.cost = self.calculate_cost() - self.calculate_discount()
         self.down_payment = self.calculate_down_payment()
 
 
     def calculate_cost(self):
         if self.machine == "harvester":
-            return self.biz_manager.get_rule("harvester_price")
+            return self.biz_manager.harvester_price
         if self.machine == "scooper": 
-            return self.daterange.hours() * self.biz_manager.get_rule("scooper_price_per_hour")
+            return self.daterange.hours() * self.biz_manager.scooper_price_per_hour
         if self.machine == "scanner":    
-            return self.daterange.hours() * self.biz_manager.get_rule("scanner_price_per_hour")
+            return self.daterange.hours() * self.biz_manager.scanner_price_per_hour
         
     def calculate_discount(self):
         # Early bird discount of 25% if reservation is made more than 13 days in advance
@@ -306,18 +339,19 @@ class Reservation:
         return self.cost * 0.5
 
 
-def calculate_refund(start_date, down_payment):
-    # calculate refund based on number of advance days of cancellation
-    biz_manager = BusinessManager()
-    start_date = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
-    advance_days = (start_date - datetime.now()).days
-    if advance_days >= 7:
-        refund = biz_manager.get_rule("week_refund") * down_payment # 0.75 * down_payment
-    elif advance_days >= 2:
-        refund = biz_manager.get_rule("two_day_refund") * down_payment # 0.5 * down_payment
-    else:
-        refund = 0
-    return refund
+    def calculate_refund(self):
+        # calculate refund based on number of advance days of cancellation
+        start_date = self.daterange.start_date
+        
+        advance_days = (start_date - datetime.now()).days
+        if advance_days >= 7:
+            refund = self.biz_manager.week_refund * self.down_payment # 0.75 * down_payment
+        elif advance_days >= 2:
+            refund = self.biz_manager.two_day_refund * self.down_payment # 0.5 * down_payment
+        else:
+            refund = 0
+
+        return refund
 
 class ReservationCalendar:
     '''
@@ -339,22 +373,9 @@ class ReservationCalendar:
     '''
 
     def __init__(self, DatabaseManager):
-        #self.reservations = {}
-        #self.harvester_price = harvester_price
-        #self.scooper_price_per_hour = scooper_price_per_hour
-        #self.scanner_price_per_hour = scanner_price_per_hour
-        #self.number_of_scoopers = number_of_scoopers
-        #self.number_of_scanners = number_of_scanners
-        #self.weekday_start = weekday_start
-        #self.weekday_end = weekday_end
-        #self.weekend_start = weekdend_start
-        #self.weekend_end = weekend_end
-        #self.week_refund = week_refund
-        #self.two_day_refund = two_day_refund
         
         self.db_manager = DatabaseManager
-        print(f"Reservation Calendar initialized")
-        self.biz_manager = BusinessManager()
+        self.biz_manager = BusinessManager(DatabaseManager)
 
     '''def update_settings(self, **kwargs): 
         """
@@ -368,61 +389,61 @@ class ReservationCalendar:
             else:
                 raise AttributeError(f"'ReservationCalendar' object has no attribute '{key}'")''' # This is not needed anymore its just a block quote
 
-    def get_db(self):
-        """
-        Connect to database
-        """
-        try:
-            conn = sqlite3.connect('../reservationDB.db')
-            conn.row_factory = sqlite3.Row
-            return conn
-        except sqlite3.Error as e:
-            print("Error while connecting to database: ",str(e))
-            raise
+    # def get_db(self):
+    #     """
+    #     Connect to database
+    #     """
+    #     try:
+    #         conn = sqlite3.connect('../reservationDB.db')
+    #         conn.row_factory = sqlite3.Row
+    #         return conn
+    #     except sqlite3.Error as e:
+    #         print("Error while connecting to database: ",str(e))
+    #         raise
 
-    def login(self, login_username):
+    # def login(self, login_username):
 
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-            cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
-            user = cursor.fetchone()
-            conn.close()
-            return user
+    #     try:
+    #         conn = self.get_db()
+    #         cursor = conn.cursor()
+    #         cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
+    #         user = cursor.fetchone()
+    #         conn.close()
+    #         return user
                
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
+    #     except sqlite3.Error as e:
+    #         print("Database error: ",str(e))
+    #         raise
 
-    def retrieve_admin_check(self, username):
+    # def retrieve_admin_check(self, username):
 
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
-            count = cursor.fetchone()[0]
-            cursor.execute("SELECT role FROM User WHERE username = ?", (username,))
-            user_role = cursor.fetchone()[0]
-            conn.close()
-            return count, user_role
+    #     try:
+    #         conn = self.get_db()
+    #         cursor = conn.cursor()
+    #         cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
+    #         count = cursor.fetchone()[0]
+    #         cursor.execute("SELECT role FROM User WHERE username = ?", (username,))
+    #         user_role = cursor.fetchone()[0]
+    #         conn.close()
+    #         return count, user_role
                
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
+    #     except sqlite3.Error as e:
+    #         print("Database error: ",str(e))
+    #         raise
 
-    def retrieve_by_id(self, reservation_id):
+    # def retrieve_by_id(self, reservation_id):
 
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-            cursor.execute("SELECT customer FROM Reservation WHERE reservation_id = ?", (reservation_id,))
-            reserv = cursor.fetchone()
-            conn.close()
-            return reserv
+    #     try:
+    #         conn = self.get_db()
+    #         cursor = conn.cursor()
+    #         cursor.execute("SELECT customer FROM Reservation WHERE reservation_id = ?", (reservation_id,))
+    #         reserv = cursor.fetchone()
+    #         conn.close()
+    #         return reserv
                
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
+    #     except sqlite3.Error as e:
+    #         print("Database error: ",str(e))
+    #         raise
 
     def retrieve_by_date(self, daterange):
 
@@ -521,105 +542,44 @@ class ReservationCalendar:
     
     
     def add_reservation(self, reservation):
-
-        # self._verify_business_hours(reservation) !!! These checks need to be refactored to use the database
-        self._check_equipment_availability(reservation)
         try:
-            # conn = self.get_db()              !!!!!IMPORTANT!!!!! I refactored this but I'm not sure why it's here!!!
-            # cursor = conn.cursor()
-            # # get machine id
-            # cursor.execute("SELECT machine_id from Machine WHERE name = ?", (reservation.machine,))
-            # machine_id = cursor.fetchone()
-            # if not machine_id:
-            #     raise ValueError("Machine not found")
-            machine_query = "SELECT machine_id FROM Machine WHERE name = ?"
-            machine_id_result = self.db_manager.execute_query(machine_query, (reservation.machine,))
-            if not machine_id_result:
-                raise ValueError("Machine not found")
-            machine_id = machine_id_result[0]['Machine_id'] #Capitalized!
-
-            reservation_query = """
-            INSERT INTO Reservation (customer, machine_id, 
-            start_date, end_date, total_cost, down_payment) 
-            VALUES (?, ?, ?, ?, ?, ?)
-            """
-            self.db_manager.execute_statement(reservation_query, (
-                reservation.customer, machine_id,
-                reservation.daterange.start_date,
-                reservation.daterange.end_date,
-                reservation.cost, reservation.down_payment
-            ))
-
-            # query = """
-            # INSERT INTO Reservation (customer, machine_id, 
-            # start_date, end_date, total_cost, down_payment) 
-            # VALUES (?, ?, ?, ?, ?, ?)
-            # """
-            # cursor.execute(query,(reservation.customer, machine_id[0],
-            #                         reservation.daterange.start_date, reservation.daterange.end_date,
-            #                         reservation.cost, reservation.down_payment))
-            # conn.commit()
-            # conn.close()
-
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
-        except Exception as e:
+            machine_id = self._get_Machine_id(reservation)
+            self._verify_business_hours(reservation)
+            self._check_equipment_availability(reservation)
+            self._save_reservation(reservation, machine_id)
+        except ValueError as e:
             print(f"Error: {e}")
             raise
         
-    def add_user(self, username, password_hash, salt, user_role):
+    # def add_user(self, username, password_hash, salt, user_role):
 
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO User (username, password_hash, salt, role) VALUES (?, ?, ?, ?)", 
-                       (username, password_hash, salt, user_role))
-            conn.commit()
-            conn.close()
+    #     try:
+    #         conn = self.get_db()
+    #         cursor = conn.cursor()
+    #         cursor.execute("INSERT INTO User (username, password_hash, salt, role) VALUES (?, ?, ?, ?)", 
+    #                    (username, password_hash, salt, user_role))
+    #         conn.commit()
+    #         conn.close()
                
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
+    #     except sqlite3.Error as e:
+    #         print("Database error: ",str(e))
+    #         raise
 
-    def remove_user(self, username):
-
-        try:
-            query = "DELETE FROM User WHERE username = ?"
-            params = (username,)
-            self.db_manager.execute_statement(query, params)
+    # def update_user_password(self, new_hashed_password, new_salt, username):
+    #     try:
+    #         conn = self.get_db()
+    #         cursor = conn.cursor()
+    #         cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
+    #                    (new_hashed_password, new_salt, username))
+    #         conn.commit()
+    #         conn.close()
                
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
-
-    def update_user_role(self, new_role, username):
-        try:
-            query = "UPDATE User SET role = ? WHERE username = ?"
-            params = (new_role, username)
-            self.db_manager.execute_statement(query, params)
-            
-        except sqlite3.Error as e:
-            print("Database error: ", str(e))
-            raise
-
-
-    def update_user_password(self, new_hashed_password, new_salt, username):
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
-                       (new_hashed_password, new_salt, username))
-            conn.commit()
-            conn.close()
-               
-        except sqlite3.Error as e:
-            print("Database error: ",str(e))
-            raise
+    #     except sqlite3.Error as e:
+    #         print("Database error: ",str(e))
+    #         raise
     
     def remove_reservation(self, reservation_id):
         try:
-            print(f'remove_reservation try block started for: {reservation_id}')
             # Query to get the reservation details for the given reservation_id
             query = """
                 SELECT 
@@ -637,7 +597,6 @@ class ReservationCalendar:
             if result:  # Check if reservation exists
                 start_date = result[0]['start_date']
                 end_date = result[0]['end_date']
-                down_payment = result[0]['down_payment']
                 machine_name = result[0]['machine_name']
                 # Create a Reservation instance
                 start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d %H:%M')
@@ -647,18 +606,14 @@ class ReservationCalendar:
                 reservation = Reservation(
                     customer_name="", # Not needed for refund calculation
                     machine_name=machine_name,
-                    daterange=daterange
+                    daterange=daterange,
+                    business_manager=self.biz_manager
                     )
-                
                 # Calculate the refund using the Reservation class method
-                refund = reservation.calculate_refund(
-                    down_payment=down_payment
-                )
-                
+                refund = reservation.calculate_refund()
                 # Query to delete the reservation
                 delete_query = "DELETE FROM Reservation WHERE reservation_id = ?"
                 self.db_manager.execute_statement(delete_query, (reservation_id,))
-                
                 return refund
             
             return False
@@ -666,7 +621,34 @@ class ReservationCalendar:
         except sqlite3.Error as e:
             print("Database error: ", str(e))
             
-    
+    def _get_Machine_id(self, reservation):
+        try:
+            machine_query = "SELECT machine_id FROM Machine WHERE name = ?"
+            machine_id_result = self.db_manager.execute_query(machine_query, (reservation.machine,))
+            if not machine_id_result:
+                raise ValueError("Machine not found")
+            machine_id = machine_id_result[0]['Machine_id']
+            return machine_id
+        except sqlite3.Error as e:
+            print("Database error: ", str(e))
+            raise
+
+    def _save_reservation(self, reservation, machine_id):
+        try:
+            reservation_query = """
+                INSERT INTO Reservation (customer, machine_id, 
+                start_date, end_date, total_cost, down_payment) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
+            self.db_manager.execute_statement(reservation_query, (
+                reservation.customer, machine_id,
+                reservation.daterange.start_date,
+                reservation.daterange.end_date,
+                reservation.cost, reservation.down_payment
+            ))
+        except sqlite3.Error as e:
+            print("Database error: ", str(e))
+            raise
 
     def _verify_business_hours(self, reservation):
         # Check if the reservation is on a Sunday
@@ -674,10 +656,10 @@ class ReservationCalendar:
             raise ValueError("Reservations cannot be made on Sundays.")
 
         # Check Saturday hours
-        weekday_start = self.biz_manager.get_rule("weekday_start")
-        weekday_end = self.biz_manager.get_rule("weekday_end")
-        weekend_start = self.biz_manager.get_rule("weekend_start")
-        weekend_end = self.biz_manager.get_rule("weekend_end")
+        weekday_start = self.biz_manager.weekday_start
+        weekday_end = self.biz_manager.weekday_end
+        weekend_start = self.biz_manager.weekend_start
+        weekend_end = self.biz_manager.weekend_end
 
         if reservation.daterange.start_date.weekday() == 5:
             if (reservation.daterange.start_date.time() > datetime.strptime(weekend_end, "%H:%M").time() or #"16:00"
@@ -685,7 +667,6 @@ class ReservationCalendar:
                 reservation.daterange.start_date.time() < datetime.strptime(weekend_start, "%H:%M").time() or #"10:00"
                 reservation.daterange.end_date.time() < datetime.strptime(weekend_start, "%H:%M").time()): #"10:00"
                 raise ValueError("Reservations on Saturdays must be between 10:00 and 16:00.")
-
         # Check weekday hours
         if reservation.daterange.start_date.weekday() < 5:
             if (reservation.daterange.start_date.time() < datetime.strptime(weekday_start, "%H:%M").time() or #"9:00"
@@ -715,7 +696,7 @@ class ReservationCalendar:
 
             # Check constraints for scanners
             if reservation.machine == "scanner":
-                if scanner_count >= self.biz_manager.get_rule("number_of_scanners"): #3
+                if scanner_count >= self.biz_manager.number_of_scanners: #3
                     raise ValueError("Maximum number of scanners already reserved for this time period.")
                 if harvester_reserved:
                     raise ValueError("Scanners cannot operate while the harvester is in use.")
@@ -729,7 +710,7 @@ class ReservationCalendar:
 
             # Check constraints for scoopers
             if reservation.machine == "scooper":
-                if scooper_count >= self.biz_manager.get_rule("number_of_scoopers"):  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
+                if scooper_count >= self.biz_manager.number_of_scoopers:  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
                     raise ValueError("Only one scooper must remain available; maximum number already reserved.")
 
                 # General check for other machines (if more types are added in the future)

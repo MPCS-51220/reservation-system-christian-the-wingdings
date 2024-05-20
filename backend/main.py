@@ -17,14 +17,14 @@ app = FastAPI()
 def get_db_manager():
     return DatabaseManager('../reservationDB.db')
 
+def get_business_manager(db_manager: DatabaseManager = Depends(get_db_manager)):
+    return BusinessManager(db_manager)
+
 def get_user_manager(db_manager: DatabaseManager = Depends(get_db_manager)):
     return UserManager(db_manager)
 
 def get_calendar(db_manager: DatabaseManager = Depends(get_db_manager)):
     return ReservationCalendar(db_manager)
-
-# calendar = ReservationCalendar() #Note to self: This is a temporary solution. The calendar should be created in the main function and passed as a dependency to the endpoints that need it.
-
 
 
 
@@ -68,7 +68,8 @@ def root():
 
 
 @app.post("/login")
-async def login(userlog: UserLogin, user_manager: UserManager = Depends(get_user_manager)):
+async def login(userlog: UserLogin,
+                user_manager: UserManager = Depends(get_user_manager)):
     try:
         user = user_manager.authenticate_user(userlog.username, userlog.password)
         if not user:
@@ -120,9 +121,9 @@ configure_biz_rules_permissions = {
 @validate_user
 @role_required(configure_biz_rules_permissions)
 async def configure_business_rules(request: Request,
-                             bizRule: BusinessRule):
-    
-    bizManager = BusinessManager()
+                             bizRule: BusinessRule,
+                             bizManager = Depends(get_business_manager)):
+
     rule = bizRule.rule
     value = bizRule.value
     
@@ -167,7 +168,8 @@ add_reservation_permissions = {
 async def add_reservation(request: Request,
                             reservation_request: Reservation_Req,
                             user_manager: UserManager = Depends(get_user_manager),
-                            calendar: ReservationCalendar = Depends(get_calendar)):
+                            calendar: ReservationCalendar = Depends(get_calendar),
+                            business_manager: BusinessManager = Depends(get_business_manager)):
     """
     This endpoints attempts to add a reservation with a particular
     customer name, machine, start date and end date. It returns a
@@ -180,7 +182,8 @@ async def add_reservation(request: Request,
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
-        reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date)
+        reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date, business_manager)
+
         calendar.add_reservation(reservation)
         log_operation(request.state.user, 
                       "add reservation", 
@@ -344,9 +347,9 @@ del_user_permissions = {
 @role_required(del_user_permissions)
 async def remove_user(request: Request,
                       username: str = Query(..., description="Username of the user to delete"),
-                      calendar: ReservationCalendar = Depends(get_calendar)):
+                      user_manager: UserManager = Depends(get_user_manager)):
     try:
-        calendar.remove_user(username)
+        user_manager.remove_user(username)
         log_operation(request.state.user,
                       "remove user", 
                       f"{username} user removed", 
@@ -376,9 +379,9 @@ patch_user_role_permissions = {
 @role_required(patch_user_role_permissions)
 async def update_user_role(request: Request,
                            role_request: UserRole,
-                           calendar: ReservationCalendar = Depends(get_calendar)):
+                           user_manager: UserManager = Depends(get_user_manager)):
     try:
-        calendar.update_user_role(role_request.role, role_request.username)
+        user_manager.update_user_role(role_request.role, role_request.username)
         log_operation(request.state.user,
                       "change user role", 
                       f"{role_request.username} role changed to {role_request.role}", 
