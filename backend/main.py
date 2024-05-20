@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException, status, Request, Query, Depends
 import urllib.parse
 import sqlite3
 from datetime import datetime
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from webbuilder import WebBuilder
 
 
 from permissions import validate_user, role_required
@@ -12,6 +16,8 @@ from schema import Reservation_Req, User, UserRole, UserLogin, Activation, Busin
 
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 
 def get_db_manager():
@@ -61,10 +67,18 @@ def log_operation(username, type, description, timestamp):
 
 
 @app.get("/")
-def root():
-    return {"message": "Hello World"}
+async def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/login-form", response_class=JSONResponse)
+async def get_login_form():
+    menu = WebBuilder()
+    menuJson = menu.build_menu()
+    if menuJson is not None:
+        return JSONResponse(content=menuJson)
+ 
+    return JSONResponse(content={"error": "Login form not found"}, status_code=404)
 
 
 @app.post("/login")
@@ -79,7 +93,11 @@ async def login(userlog: UserLogin,
                                                     })
         print(f"user: {user['username']}, role: {user['role']} logged in")
         log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
-        return {"access_token": access_token, "token_type": "bearer"}
+        
+        menu = WebBuilder(user['role'])
+        menuJson = menu.build_menu()
+        
+        return {"access_token": access_token, "token_type": "bearer", "interface": menuJson}
     
     except HTTPException as http_exc:
         raise http_exc

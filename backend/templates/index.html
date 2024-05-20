@@ -1,0 +1,20 @@
+<!-- base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hello World</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', path='/main.js') }}"></script>
+</head>
+<body>
+    <div id="app-container">
+        <div id="login-form-container"></div>
+        <ul id="menu-container" class="hide"></ul>
+        <div id="command-container" class="hide"></div>
+        <div id="results-container" class="hide"></div>
+    </div>
+    {% block content %}{% endblock %}
+</body>
+</html>
