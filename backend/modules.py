@@ -130,10 +130,10 @@ class UserManager:
             query = "SELECT is_active FROM User WHERE username = ?"
             user = self.db_manager.execute_query(query, (username,))
             print(f"User: {user}")
-            # if user:
-            # and user['is_active']:
-            return True
-            # return False
+            if user:
+             if user['is_active']:
+                return True
+            return False
         
         except sqlite3.Error as e:
             print("Database error: ",str(e))
@@ -490,7 +490,7 @@ class ReservationCalendar:
         return final_reservations
     
     
-    def add_reservation(self, reservation):
+    def add_reservation(self, reservation, outside_reservation=False):
 
         # self._verify_business_hours(reservation) !!! These checks need to be refactored to use the database
         self._check_equipment_availability(reservation)
@@ -502,23 +502,39 @@ class ReservationCalendar:
             # machine_id = cursor.fetchone()
             # if not machine_id:
             #     raise ValueError("Machine not found")
-            machine_query = "SELECT machine_id FROM Machine WHERE name = ?"
-            machine_id_result = self.db_manager.execute_query(machine_query, (reservation.machine,))
-            if not machine_id_result:
-                raise ValueError("Machine not found")
-            machine_id = machine_id_result[0]['Machine_id'] #Capitalized!
 
-            reservation_query = """
-            INSERT INTO Reservation (customer, machine_id, 
-            start_date, end_date, total_cost, down_payment) 
-            VALUES (?, ?, ?, ?, ?, ?)
-            """
-            self.db_manager.execute_statement(reservation_query, (
-                reservation.customer, machine_id,
-                reservation.daterange.start_date,
-                reservation.daterange.end_date,
-                reservation.cost, reservation.down_payment
-            ))
+            if not outside_reservation:
+                machine_query = "SELECT machine_id FROM Machine WHERE name = ?"
+                machine_id_result = self.db_manager.execute_query(machine_query, (reservation.machine,))
+                if not machine_id_result:
+                    raise ValueError("Machine not found")
+                machine_id = machine_id_result[0]['Machine_id'] #Capitalized!
+
+                reservation_query = """
+                INSERT INTO Reservation (customer, machine_id, 
+                start_date, end_date, total_cost, down_payment) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
+                self.db_manager.execute_statement(reservation_query, (
+                    reservation.customer, machine_id,
+                    reservation.daterange.start_date,
+                    reservation.daterange.end_date,
+                    reservation.cost, reservation.down_payment
+                ))
+            
+            else: # store remote reservation in different table
+                reservation_query = """
+                INSERT INTO Remote_Reservation (customer, machine_name, 
+                start_date, end_date, total_cost, down_payment) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
+                self.db_manager.execute_statement(reservation_query, (
+                    reservation.customer, reservation.machine,
+                    reservation.daterange.start_date,
+                    reservation.daterange.end_date,
+                    reservation.cost, reservation.down_payment
+                ))
+
 
             # query = """
             # INSERT INTO Reservation (customer, machine_id, 
