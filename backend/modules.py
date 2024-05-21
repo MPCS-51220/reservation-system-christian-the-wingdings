@@ -222,7 +222,6 @@ class DatabaseManager:
                         cursor.execute(query)
                     conn.commit()
                     rows = cursor.fetchall()
-                    print(f'Rows: {rows}')
                     if rows:
                         print(f'Get Connection returned: {[dict(zip([column[0] for column in cursor.description], row)) for row in rows]}')
                         return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
@@ -529,17 +528,35 @@ class ReservationCalendar:
 
     
     def retrieve_by_machine_and_customer(self, daterange, machine, customer):
-        final_reservations = []
-    
-        for reservation in self.reservations.values():
-            if (reservation.machine == machine and 
-                reservation.customer == customer and 
-                reservation.daterange.start_date <= daterange.end_date and 
-                reservation.daterange.end_date >= daterange.start_date):
-                final_reservations.append(reservation)
+        try:
+            start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            
+            query = """
+            SELECT
+                Reservation.*,
+                Machine.name AS machine_name
+            FROM Reservation
+            JOIN Machine ON Reservation.machine_id = Machine.machine_id
+            WHERE Machine.name = ?
+            AND customer = ?
+            AND datetime(Reservation.start_date) <= datetime(?)
+            AND datetime(Reservation.end_date) >= datetime(?)
+            """
+            
+            params = (machine, customer, end, start)
+            
+            result = self.db_manager.execute_query(query, params)
+            return result
         
-        return final_reservations
-    
+        except sqlite3.Error as e:
+            print("Database error: ", str(e))
+            raise
+        except Exception as e:
+            print(f"Error: {e}")
+            raise
+
+       
     
     def add_reservation(self, reservation):
         try:

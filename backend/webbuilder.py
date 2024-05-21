@@ -15,12 +15,14 @@ class WebBuilder:
                         "prompt": "username: ",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Username must be a valid string."
                     },
                     {
                         "prompt": "password: ",
                         "tag": "password",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid Password format. Please try again."
                     }
                 ]
@@ -34,19 +36,22 @@ class WebBuilder:
                         "prompt": "Enter start date (YYYY-MM-DD HH:MM)",
                         "tag": "start_date",
                         "validate": "datetime",
+                        "optional": False,
                         "error_message": "Invalid date format or past date entered. Please try again."
                     },
                     {
                         "prompt": "Enter end date (YYYY-MM-DD HH:MM)",
                         "tag": "end_date",
                         "validate": "datetime",
+                        "optional": False,
                         "error_message": "Invalid date format or past date entered. Please try again."
                     },
                     {
                         "prompt": "Select the machine type",
                         "tag": "machine",
                         "validate": "enum",
-                        "options": ["Type A", "Type B", "Type C"],
+                        "options": ["Scanner", "Scooper", "Harvester"],
+                        "optional": False,
                         "error_message": "Invalid machine type selected. Please try again."
                     },
                     {
@@ -54,6 +59,7 @@ class WebBuilder:
                         "tag": "customer",
                         "roles": ["admin", "scheduler"],
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid name entered. Please try again."
                     }
                 ]
@@ -68,39 +74,45 @@ class WebBuilder:
                         "prompt": "Enter the reservation ID to cancel",
                         "tag": "reservation_id",
                         "validate": "integer",
+                        "optional": False,
                         "error_message": "Invalid reservation ID. Please enter a positive integer."
                     }
                 ]
             },
             {
-                "name": "List reservations by customer and date",
+                "name": "List Reservations", # by customer and date",
                 "roles": ["admin", "scheduler", "customer"],
-                "route": "/reservations/customers",
+                "route": "/reservations",
                 "method": "GET",
                 "inputs": [
                     {
-                        "prompt": "Enter start date (YYYY-MM-DD)",
+                        "prompt": "Enter start date (YYYY-MM-DD HH:MM)",
                         "tag": "start_date",
                         "validate": "date",
+                        "optional": False,
                         "error_message": "Invalid start date. Please try again."
                     },
                     {
-                        "prompt": "Enter end date (YYYY-MM-DD)",
+                        "prompt": "Enter end date (YYYY-MM-DD HH:MM)",
                         "tag": "end_date",
                         "validate": "date",
+                        "optional": False,
                         "error_message": "Invalid end date. Please try again."
                     },
-                    # {
-                    #     "prompt": "Select the machine type",
-                    #     "validate": "enum",
-                    #     "options": ["Type A", "Type B", "Type C"],
-                    #     "error_message": "Invalid machine type selected. Please try again."
-                    # },
+                    {
+                        "prompt": "Select the machine type",
+                        "tag": "machine",
+                        "validate": "enum",
+                        "options": ["scanner", "scooper", "harvester"],
+                        "optional": True,
+                        "error_message": "Invalid machine type selected. Please try again."
+                    },
                     {
                         "prompt": "Enter customer name",
                         "roles": ["admin", "scheduler"],
                         "tag": "customer",
                         "validate": "string",
+                        "optional": True,
                         "error_message": "Invalid name entered. Please try again."
                     }
                 ]
@@ -140,28 +152,32 @@ class WebBuilder:
                 ]
             },
             {
-                "name": "Change My Password",
+                "name": "Reset Password",
                 "roles": ["admin", "customer"],
                 "route": "/users/password",
                 "method": "PATCH",
                 "inputs": [
                     {
-                        "prompt": "Enter the username of the user you would like to change the password for",
+                        "prompt": "Enter the username of the user leave blank to reset your own password",
                         "tag": "username",
                         "roles": ["admin"],
                         "validate": "string",
+                        "optional": True,
                         "error_message": "Invalid string format. Please try again."
                     },
                     {
-                        "prompt": "Enter your new password",
+                        "prompt": "Enter new password",
                         "tag": "password",
                         "validate": "password",
+                        "optional": False,
                         "error_message": "Invalid password format. Please try again."
                     },
                     {
                         "prompt": "Enter a salt",
                         "tag": "salt",
+                        "roles": ["admin"],
                         "validate": "string",
+                        "optional": True,
                         "error_message": "Invalid salt format. Please try again."
                     }
                 ]
@@ -188,13 +204,15 @@ class WebBuilder:
                         "prompt": "Enter new username",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid username. Please try again."
                     },
                     {
-                        "prompt": "Enter user role (customer, scheduler, admin)",
+                        "prompt": "Select user role",
                         "tag": "role",
                         "validate": "enum",
                         "options": ["customer", "scheduler", "admin"],
+                        "optional": False,
                         "error_message": "Invalid role. Please select from customer, scheduler, admin."
                     },
                     {
@@ -221,6 +239,7 @@ class WebBuilder:
                         "prompt": "Enter username of the user to remove",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid username. Please try again."
                     }
                 ]
@@ -235,13 +254,15 @@ class WebBuilder:
                         "prompt": "Enter username of the user to change role",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid username. Please try again."
                     },
                     {
-                        "prompt": "Enter new role (customer, scheduler, admin)",
+                        "prompt": "Select new role",
                         "tag": "role",
                         "validate": "enum",
                         "options": ["customer", "scheduler", "admin"],
+                        "optional": False,
                         "error_message": "Invalid role. Please select from customer, scheduler, admin."
                     }
                 ]
@@ -256,6 +277,7 @@ class WebBuilder:
                         "prompt": "Enter username for password reset",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid username. Please try again."
                     }
                 ]
@@ -267,15 +289,22 @@ class WebBuilder:
                 "method": "POST",
                 "inputs": [
                     {
-                        "prompt": "Enter the rule you wish to change from the list: \n harvester_price \n scooper_price_per_hour \n scanner_price_per_hour \n number_of_scoopers \n number_of_scanners \n weekday_start \n weekday_end \n weekdend_start \n weekend_end \n week_refund \n two_day_refund \n",
+                        "prompt": "Select the rule",
                         "tag": "rule",
-                        "validate": "string",
+                        "validate": "enum",
+                        "options": ["harvester_price", "scooper_price_per_hour",
+                                    "scanner_price_per_hour", "number_of_scoopers",
+                                    "number_of_scanners", "weekday_start", "weekday_end",
+                                    "weekend_start", "weekend_end", "week_refund", "two_day_refund"
+                                    ],
+                        "optional": False,
                         "error_message": "Invalid rule format. Please try again."
                     },
                     {
-                        "prompt": "Enter the value you want for the rule \n",
+                        "prompt": "Enter the value you want for the rule",
                         "tag": "value",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid value format. Please try again."
                     }
                 ]
@@ -290,6 +319,7 @@ class WebBuilder:
                         "prompt": "Enter username to deactivate",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid username. Please try again."
                     }
                 ]
@@ -304,6 +334,7 @@ class WebBuilder:
                         "prompt": "Enter username to activate",
                         "tag": "username",
                         "validate": "string",
+                        "optional": False,
                         "error_message": "Invalid username. Please try again."
                     }
                 ]
@@ -312,7 +343,7 @@ class WebBuilder:
                 "name": "List activation state of users",
                 "roles": ["admin"],
                 "route": "/users",
-                "inputs":[],
+                # "inputs":[],
                 "method": "GET",
             }
 

@@ -42,14 +42,39 @@ $(document).ready(function() {
                 command.inputs.forEach(input => {
                     const label = document.createElement('label');
                     label.textContent = input.prompt;
+                    if (!input.optional) {
+                        label.classList.add('required');
+                    }
                     form.appendChild(label);
 
-                    const inputField = document.createElement('input');
-                    inputField.setAttribute('type', input.tag === 'password' ? 'password' : 'text');
-                    inputField.setAttribute('name', input.tag);
-                    inputField.setAttribute('required', true);
-                    form.appendChild(inputField);
+                    let inputField;
+                    if (input.validate === 'enum') {
+                        inputField = document.createElement('select');
+                        inputField.classList.add(input.optional ? 'optional' : 'required');
 
+                        if (input.optional) {
+                            const blankOption = document.createElement('option');
+                            blankOption.value = "";
+                            blankOption.textContent = "";
+                            inputField.appendChild(blankOption);
+                        }
+
+                        input.options.forEach(option => {
+                            const optionElement = document.createElement('option');
+                            optionElement.value = option;
+                            optionElement.textContent = option;
+                            inputField.appendChild(optionElement);
+                        });
+                    } else {
+                        inputField = document.createElement('input');
+                        inputField.setAttribute('type', input.tag === 'password' ? 'password' : 'text');
+                    }
+
+                    inputField.setAttribute('name', input.tag);
+                    if (!input.optional) {
+                        inputField.setAttribute('required', true);
+                    }
+                    form.appendChild(inputField);
                     form.appendChild(document.createElement('br'));
                 });
 
@@ -124,14 +149,39 @@ $(document).ready(function() {
             command.inputs.forEach(input => {
                 const label = document.createElement('label');
                 label.textContent = input.prompt;
+                if (!input.optional) {
+                    label.classList.add('required');
+                }
                 form.appendChild(label);
 
-                const inputField = document.createElement('input');
-                inputField.setAttribute('type', input.validate === 'password' ? 'password' : 'text');
-                inputField.setAttribute('name', input.tag);
-                inputField.setAttribute('required', true);
-                form.appendChild(inputField);
+                let inputField;
+                if (input.validate === 'enum') {
+                    inputField = document.createElement('select');
+                    inputField.classList.add(input.optional ? 'optional' : 'required');
 
+                    if (input.optional) {
+                        const blankOption = document.createElement('option');
+                        blankOption.value = "";
+                        blankOption.textContent = "";
+                        inputField.appendChild(blankOption);
+                    }
+
+                    input.options.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option;
+                        optionElement.textContent = option;
+                        inputField.appendChild(optionElement);
+                    });
+                } else {
+                    inputField = document.createElement('input');
+                    inputField.setAttribute('type', input.validate === 'password' ? 'password' : 'text');
+                }
+
+                inputField.setAttribute('name', input.tag);
+                if (!input.optional) {
+                    inputField.setAttribute('required', true);
+                }
+                form.appendChild(inputField);
                 form.appendChild(document.createElement('br'));
             });
 
@@ -165,7 +215,16 @@ $(document).ready(function() {
             };
 
             if (command.method.toLowerCase() === 'get' || command.method.toLowerCase() === 'delete') {
-                url += '?' + new URLSearchParams(jsonData).toString();
+                // Include only non-empty values and optional parameters
+                const queryParams = {};
+                command.inputs.forEach(input => {
+                    const value = jsonData[input.tag];
+                    if (value && (input.optional || value.trim() !== '')) {
+                        queryParams[input.tag] = value;
+                    }
+                });
+                url += '?' + new URLSearchParams(queryParams).toString();
+                console.log('GET/DELETE URL:', url);
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(jsonData);

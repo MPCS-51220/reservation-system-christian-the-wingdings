@@ -34,13 +34,14 @@ body {
     height: 100%; /* Set a fixed height */
     overflow-y: auto; /* Make overflow scrollable */
     margin-right: 10px;
-    background-color: #111;
+    /* background-color: #111; */
     /* border: 2px solid #fff; */
     padding: 10px;
 }
 
 #menu-container {
     border: 2px solid #fff;
+    background-color: #111;
 }
 
 #menu-container li {
@@ -55,6 +56,7 @@ body {
 }
 
 #command-container {
+    background-color: None;
     border-right: 2px solid #fff;
     /* padding: 10px; */
 }
@@ -68,6 +70,14 @@ body {
 }
 
 #command-container input {
+    margin-bottom: 20px;
+    padding: 5px;
+    background-color: #000;
+    color: #fff;
+    border: 1px solid #fff;
+}
+
+#command-container select {
     margin-bottom: 20px;
     padding: 5px;
     background-color: #000;
@@ -97,6 +107,10 @@ body {
     color: #fff;
 }
 
+#results-container {
+    background-color: #111;
+}
+
 .result-card {
     background-color: #222;
     border: 1px solid #fff;
@@ -113,3 +127,13 @@ body {
     border-left: 1px solid #fff;
     padding-left: 10px;
 }
+
+label.required::after {
+    content: " *";
+    color: red;
+    margin-left: 5px;
+}
+
+/* select.optional option:first-child {
+    display: none;
+} */

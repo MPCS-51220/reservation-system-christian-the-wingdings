@@ -216,46 +216,46 @@ async def add_reservation(request: Request,
 
 
 
-get_reservation_permissions = {
-    "admin": None,
-    "scheduler": None
-}
+# get_reservation_permissions = {
+#     "admin": None,
+#     "scheduler": None
+# }
 
-@app.get("/reservations/customers", status_code=status.HTTP_200_OK)
-@validate_user
-@role_required(get_reservation_permissions)
-async def get_reservations_by_customer(request: Request,
-                                      customer: str = Query(..., description="Customer name"),
-                                      start_date: str = Query(..., description="Start date of the reservation period"),
-                                      end_date: str = Query(..., description="End date of the reservation period"),
-                                      calendar: ReservationCalendar = Depends(get_calendar)):
-    """
-    This endpoint retrieves the reservations made by a customer
-    in a particular date range. It returns an appropriate message
-    if no such reservations are found.
-    """
-    try:
-        if start_date and end_date:
-            start = urllib.parse.unquote(start_date)
-            end = urllib.parse.unquote(end_date)
+# @app.get("/reservations/customers", status_code=status.HTTP_200_OK)
+# @validate_user
+# @role_required(get_reservation_permissions)
+# async def get_reservations_by_customer(request: Request,
+#                                       customer: str = Query(..., description="Customer name"),
+#                                       start_date: str = Query(..., description="Start date of the reservation period"),
+#                                       end_date: str = Query(..., description="End date of the reservation period"),
+#                                       calendar: ReservationCalendar = Depends(get_calendar)):
+#     """
+#     This endpoint retrieves the reservations made by a customer
+#     in a particular date range. It returns an appropriate message
+#     if no such reservations are found.
+#     """
+#     try:
+#         if start_date and end_date:
+#             start = urllib.parse.unquote(start_date)
+#             end = urllib.parse.unquote(end_date)
 
-            daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_customer(daterange, customer)
-        else:
-            raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        log_operation(request.state.user,
-                      "list reservations", 
-                      f"Listed reservations for {customer}", 
-                      datetime.now())
+#             daterange = DateRange(start, end)
+#             reservations = calendar.retrieve_by_customer(daterange, customer)
+#         else:
+#             raise HTTPException(status_code=400, detail="Both start and end dates are required")
+#         log_operation(request.state.user,
+#                       "list reservations", 
+#                       f"Listed reservations for {customer}", 
+#                       datetime.now())
         
-        if reservations:
-            return {"reservations":reservations}
-        else:
-            return {"message": "No reservations found for this customer."}
+#         if reservations:
+#             return {"reservations":reservations}
+#         else:
+#             return {"message": "No reservations found for this customer."}
        
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f'Failed to get reservations due to {e}')
+#     except Exception as e:
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                             detail=f'Failed to get reservations due to {e}')
 
 
 
@@ -266,49 +266,97 @@ async def get_reservations_by_customer(request: Request,
 
 
 
-get_reservation_by_machine_permissions = {
+get_reservations_prmissions = {
     "admin": None,
     "scheduler": None,
     "customer": is_customer_accessing_own_data
 }
 
-
-@app.get("/reservations/machines", status_code=status.HTTP_200_OK)
+@app.get("/reservations", status_code=status.HTTP_200_OK)
 @validate_user
-@role_required(get_reservation_by_machine_permissions)
-async def get_reservations_by_machine(request: Request,
-                                machine: str = Query(..., description="Machine to get records for"),
-                                start_date: str = Query(..., description="Start date of the reservation period"),
-                                end_date: str = Query(..., description="End date of the reservation period"),
-                                calendar: ReservationCalendar = Depends(get_calendar)):
-
-    """
-    This endpoint retrieves the reservations made for a machine
-    in a particular date range. It returns an appropriate message
-    if no such reservations are found.
-    """
+@role_required(get_reservations_prmissions)
+async def get_reservations(request: Request,
+                           customer: str = Query(None, description="Customer name"),
+                           machine: str = Query(None, description="Machine to get records for"),
+                           start_date: str = Query(..., description="Start date of the reservation period"),
+                           end_date: str = Query(..., description="End date of the reservation period"),
+                           calendar: ReservationCalendar = Depends(get_calendar)):
     try:
-        if start_date and end_date:
-            start = urllib.parse.unquote(start_date)
-            end = urllib.parse.unquote(end_date)
-            daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_machine(daterange, machine)
-        else:
+        if request.state.role == "customer":
+            if customer and customer != request.state.user:
+                raise HTTPException(status_code=403, detail="Customers can only access their own data.")
+            customer = request.state.user
+
+        if not start_date or not end_date:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        
-        log_operation(request.state.user,
-                      "list reservations", 
-                      f"Listed reservations for machine {machine}", 
-                      datetime.now())
-        
-        if reservations:
-            return {"reservations":reservations}
+
+        start = urllib.parse.unquote(start_date)
+        end = urllib.parse.unquote(end_date)
+        daterange = DateRange(start, end)
+
+        if customer and machine:
+            reservations = calendar.retrieve_by_machine_and_customer(daterange, machine, customer)
+            logstring = f'Listed reservations for customer: {customer}, machine: {machine}'
+        elif customer:
+            reservations = calendar.retrieve_by_customer(daterange, customer)
+            logstring = f'Listed reservations for customer: {customer} in daterange: {daterange}'
+        elif machine:
+            reservations = calendar.retrieve_by_machine(daterange, machine)
+            logstring = f'Listed reservations for machine: {machine} in daterange: {daterange}'
         else:
-            return {"message": "No reservations found for this machine."}
-       
+            reservations = calendar.retrieve_by_date(daterange)
+            logstring = f'Listed reservations in daterange: {daterange}'
+
+        log_operation(request.state.user,
+                      "list reservations",
+                      logstring,
+                      datetime.now())
+
+        if reservations:
+            return {"reservations": reservations}
+        else:
+            return {"message": "No reservations found for the given criteria."}
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to get reservations due to {e}')
+                            detail=f'Failed to get reservations due to {e}')
+
+# @app.get("/reservations/machines", status_code=status.HTTP_200_OK)
+# @validate_user
+# @role_required(get_reservation_by_machine_permissions)
+# async def get_reservations_by_machine(request: Request,
+#                                 machine: str = Query(..., description="Machine to get records for"),
+#                                 start_date: str = Query(..., description="Start date of the reservation period"),
+#                                 end_date: str = Query(..., description="End date of the reservation period"),
+#                                 calendar: ReservationCalendar = Depends(get_calendar)):
+
+#     """
+#     This endpoint retrieves the reservations made for a machine
+#     in a particular date range. It returns an appropriate message
+#     if no such reservations are found.
+#     """
+#     try:
+#         if start_date and end_date:
+#             start = urllib.parse.unquote(start_date)
+#             end = urllib.parse.unquote(end_date)
+#             daterange = DateRange(start, end)
+#             reservations = calendar.retrieve_by_machine(daterange, machine)
+#         else:
+#             raise HTTPException(status_code=400, detail="Both start and end dates are required")
+        
+#         log_operation(request.state.user,
+#                       "list reservations", 
+#                       f"Listed reservations for machine {machine}", 
+#                       datetime.now())
+        
+#         if reservations:
+#             return {"reservations":reservations}
+#         else:
+#             return {"message": "No reservations found for this machine."}
+       
+#     except Exception as e:
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                     detail=f'Failed to get reservations due to {e}')
 
 
 
