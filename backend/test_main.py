@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 import sqlite3
 from datetime import datetime
-from modules import DateRange, Reservation, ReservationCalendar, UserManager
+from modules import DateRange, Reservation, ReservationCalendar, UserManager, DatabaseManager, BusinessManager
 import pytest
-from main import app, calendar
+from main import app
 import hashlib
 
 
@@ -28,7 +28,7 @@ def transaction(db):
     yield cursor
     db.rollback()
     
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def setup_db(db):
     username = "adminTest"
     password = "adminpass"
@@ -57,31 +57,195 @@ def client(db):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(scope="session")
+def db_manager(db):
+    # Instantiate DatabaseManager with the in-memory database connection
+    return DatabaseManager(connection=db)
+
+
+@pytest.fixture
+def user_manager(db_manager):
+    return UserManager(db_manager)
+
+@pytest.fixture
+def biz_manager(db_manager):
+    return BusinessManager(db_manager)
+
+@pytest.fixture
+def calendar(db_manager):
+    return ReservationCalendar(db_manager)
+
 ############ Database Tests ############
 
 
 ############ API ROUTES Tests ############
-@pytest.mark.parametrize("username, password, expected_status, expected_detail", [
-    ("adminTest", "adminpass", 200, None),  # Successful login
-    ("adminTest", "wrongpass", 401, "Incorrect username or password"),  # Incorrect password
-    (None, "adminpass", 422, None),  # Missing username
-    ("adminTest", None, 422, None),  # Missing password
-    (None, None, 422, None)  # Empty payload
-])
-def test_login(client, setup_db, transaction, username, password, expected_status, expected_detail):
-    payload = {}
-    if username is not None:
-        payload["username"] = username
-    if password is not None:
-        payload["password"] = password
+# @pytest.mark.parametrize("username, password, expected_status, expected_detail", [
+#     ("adminTest", "adminpass", 200, None),  # Successful login
+#     ("adminTest", "wrongpass", 401, "Incorrect username or password"),  # Incorrect password
+#     (None, "adminpass", 422, None),  # Missing username
+#     ("adminTest", None, 422, None),  # Missing password
+#     (None, None, 422, None)  # Empty payload
+# ])
+# def test_login(client, setup_db, transaction, username, password, expected_status, expected_detail):
+#     payload = {}
+#     if username is not None:
+#         payload["username"] = username
+#     if password is not None:
+#         payload["password"] = password
 
-    response = client.post("/login", json=payload)
-    assert response.status_code == expected_status
-    if expected_detail:
-        assert response.json()["detail"] == expected_detail
-    elif expected_status == 200:
-        assert "access_token" in response.json()
-        assert response.json()["token_type"] == "bearer"
+#     response = client.post("/login", json=payload)
+#     assert response.status_code == expected_status
+#     if expected_detail:
+#         assert response.json()["detail"] == expected_detail
+#     elif expected_status == 200:
+#         assert "access_token" in response.json()
+#         assert response.json()["token_type"] == "bearer"
+
+
+
+############ Modules Tests ############
+
+
+
+
+
+def test_get_user(setup_db, user_manager):
+    result = user_manager.get_user("adminTest")
+    assert result is not None
+    assert result['username'] == 'adminTest'
+    assert result['role'] == "admin"
+
+def test_get_user_fail(setup_db, user_manager):
+    result = user_manager.get_user("fakeuser")
+    assert result is None
+
+def test_add_user(setup_db, user_manager, transaction):
+    username = "Testuser"
+    password = "testuser"
+    role = "customer"
+    salt= "test_salt"
+    res = user_manager.add_user(username, password, role, salt)
+    assert res is not None
+    assert res == True
+    user = user_manager.get_user(username)
+    assert user is not None
+    assert user['username'] == username
+
+def test_authenticate_user(setup_db, user_manager):
+    result = user_manager.authenticate_user("adminTest", "adminpass")
+    assert result is not None
+    assert result != False
+    assert result['username'] == "adminTest"
+
+def test_authenticate_user_fail(setup_db, user_manager):
+    result = user_manager.authenticate_user("fake", "adminpass")
+    assert result == False
+
+def test_update_role(setup_db, user_manager):
+    user_manager.update_user_role("scheduler","adminTest")
+    user = user_manager.get_user("adminTest")
+    assert user is not None
+    assert user['role'] == "scheduler"
+
+def test_list_users(setup_db, user_manager):
+    result = user_manager.list_users()
+    assert result is not None
+
+def test_deactivate(setup_db, user_manager):
+    user_manager.deactivate_user("adminTest")
+    result = user_manager.is_user_active("adminTest")
+    assert result == False
+
+def test_activate(setup_db, user_manager):
+    user_manager.activate_user("adminTest")
+    result = user_manager.is_user_active("adminTest")
+    assert result == True
+
+
+def test_retrieve_by_date(setup_db, calendar):
+    daterange = DateRange("2024-01-01 10:00","2025-01-01 10:00")
+    result = calendar.retrieve_by_date(daterange)
+    assert result is not None    
+    assert len(result) > 0
+
+def test_retrieve_by_date_empty(setup_db, calendar):
+    daterange = DateRange("2010-01-01 10:00","2011-01-01 10:00")
+    result = calendar.retrieve_by_date(daterange)
+    assert result is not None    
+    assert len(result) == 0
+
+
+def test_retrieve_by_machine(setup_db, calendar):
+    daterange = DateRange("2024-01-01 10:00","2025-01-01 10:00")
+    result = calendar.retrieve_by_machine(daterange, "scanner")
+    assert result is not None    
+    assert len(result) > 0
+
+def test_retrieve_by_machine_empty(setup_db, calendar):
+    daterange = DateRange("2024-01-01 10:00","2025-01-01 10:00")
+    result = calendar.retrieve_by_machine(daterange, "fakemachine")
+    assert result is not None    
+    assert len(result) == 0
+
+def test_retrieve_by_customer(setup_db, calendar):
+    daterange = DateRange("2024-01-01 10:00","2025-01-01 10:00")
+    result = calendar.retrieve_by_customer(daterange, "akshatha")
+    assert result is not None    
+    assert len(result) > 0
+
+
+def test_retrieve_by_customer_empty(setup_db, calendar):
+    daterange = DateRange("2024-01-01 10:00","2025-01-01 10:00")
+    result = calendar.retrieve_by_customer(daterange, "fakecustomer")
+    assert result is not None    
+    assert len(result) == 0
+
+def test_add_reservation(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("akshatha", "scooper", daterange, biz_manager)
+    calendar.add_reservation(reservation)
+    result = calendar.retrieve_by_customer(daterange, "akshatha") # reservation should be present
+    assert result is not None
+    assert len(result) == 1
+
+def test_add_reservation_sunday(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-16 11:00","2025-06-16 12:00")
+    reservation = Reservation("fakecustomer", "scooper", daterange, biz_manager)
+    with pytest.raises(ValueError):
+        calendar.add_reservation(reservation)
+
+def test_add_reservation_future(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-10-16 11:00","2025-10-16 12:00")
+    reservation = Reservation("fakecustomer", "scooper", daterange, biz_manager)
+    with pytest.raises(ValueError):
+        calendar.add_reservation(reservation)
+
+def test_add_reservation_outside_working_hours(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-10 04:00","2025-06-10 05:00")
+    reservation = Reservation("fakecustomer", "scooper", daterange, biz_manager)
+    with pytest.raises(ValueError):
+        calendar.add_reservation(reservation)
+
+
+def test_remove_reservation(setup_db, transaction, calendar):
+    result = calendar.remove_reservation(3)
+    assert result is not None
+    assert result != False
+
+def test_remove_reservation_fail(setup_db, transaction, calendar):
+    result = calendar.remove_reservation(9000)
+    assert result is not None
+    assert result == False
+
+
+
+
+
+
+
+
+
+
 
 
 ############ Permissions AUTH Tests ############

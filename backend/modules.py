@@ -185,22 +185,27 @@ class DatabaseManager:
             cls._instance = super(DatabaseManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, db_path='../reservationDB.db'):
+    def __init__(self, db_path='../reservationDB.db', connection=None):
+  
         if not hasattr(self, 'initialized'):
-            self.db_path = db_path
+            self.connection = connection
+            self.db_path = db_path if connection is None else None
             self.initialized = True
-            print(f"Database Manager initialized at path: {self.db_path}")
+            # print(f"Database Manager initialized at path: {self.db_path}")
 
     @contextmanager
     def get_connection(self):
-        conn = sqlite3.connect(self.db_path)
-        try:
-            yield conn
-        except sqlite3.Error as e:
-            print(f"Database error: {e}")
-            raise
-        finally:
-            conn.close()
+        if self.connection:
+            yield self.connection
+        else:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                yield conn
+            except sqlite3.Error as e:
+                print(f"Database error: {e}")
+                raise
+            finally:
+                conn.close()
 
     def execute_query(self, query, params=None):
         """
