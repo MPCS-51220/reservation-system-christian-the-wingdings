@@ -82,7 +82,7 @@ menu = {
             {
                 "name": "List reservations by customer and date",
                 "roles": ["admin", "scheduler", "customer"],
-                "route": "/reservations/customers",
+                "route": "/reservations",
                 "method": "GET",
                 "inputs": [
                     {
@@ -115,7 +115,7 @@ menu = {
             {
                 "name": "List reservations by machine and date",
                 "roles": ["admin", "scheduler", "customer"],
-                "route": "/reservations/machines",
+                "route": "/reservations",
                 "method": "GET",
                 "inputs": [
                     {
