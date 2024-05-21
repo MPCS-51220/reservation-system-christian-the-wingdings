@@ -48,27 +48,6 @@ def convert_timezone(date_string, from_timezone, to_timezone):
     # Format the datetime object back to string
     return datetime_obj.strftime('%Y-%m-%d %H:%M')
 
-def convert_timezone(date_string, from_timezone, to_timezone):
-    """
-    Converts a datetime string from one timezone to another ."""
-
-    # dateutil uses opposite sign conventions
-    if "+" in from_timezone:
-        from_timezone = from_timezone.replace("+","-")
-    else:
-        from_timezone = from_timezone.replace("-","+")
-    
-    datetime_obj = parser.parse(date_string + ' ' + from_timezone)
-
-    to_timezone = tz.gettz(to_timezone)
-
-    # Convert the datetime object to the target timezone
-    datetime_obj = datetime_obj.astimezone(to_timezone)
-
-    # Format the datetime object back to string
-    return datetime_obj.strftime('%Y-%m-%d %H:%M')
-
-
 def get_db_manager():
     return DatabaseManager('../reservationDB.db')
 
@@ -290,58 +269,6 @@ async def add_reservation(request: Request,
                             detail=f'Failed to add reservation due to {e}')
 
 
-
-
-# get_reservation_permissions = {
-#     "admin": None,
-#     "scheduler": None
-# }
-
-# @app.get("/reservations/customers", status_code=status.HTTP_200_OK)
-# @validate_user
-# @role_required(get_reservation_permissions)
-# async def get_reservations_by_customer(request: Request,
-#                                       customer: str = Query(..., description="Customer name"),
-#                                       start_date: str = Query(..., description="Start date of the reservation period"),
-#                                       end_date: str = Query(..., description="End date of the reservation period"),
-#                                       calendar: ReservationCalendar = Depends(get_calendar)):
-#     """
-#     This endpoint retrieves the reservations made by a customer
-#     in a particular date range. It returns an appropriate message
-#     if no such reservations are found.
-#     """
-#     try:
-#         if start_date and end_date:
-#             start = urllib.parse.unquote(start_date)
-#             end = urllib.parse.unquote(end_date)
-
-#             daterange = DateRange(start, end)
-#             reservations = calendar.retrieve_by_customer(daterange, customer)
-#         else:
-#             raise HTTPException(status_code=400, detail="Both start and end dates are required")
-#         log_operation(request.state.user,
-#                       "list reservations", 
-#                       f"Listed reservations for {customer}", 
-#                       datetime.now())
-        
-#         if reservations:
-#             return {"reservations":reservations}
-#         else:
-#             return {"message": "No reservations found for this customer."}
-       
-#     except Exception as e:
-#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                             detail=f'Failed to get reservations due to {e}')
-
-
-
-
-
-
-
-
-
-
 get_reservations_prmissions = {
     "admin": None,
     "scheduler": None,
@@ -396,49 +323,6 @@ async def get_reservations(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to get reservations due to {e}')
-
-# @app.get("/reservations/machines", status_code=status.HTTP_200_OK)
-# @validate_user
-# @role_required(get_reservation_by_machine_permissions)
-# async def get_reservations_by_machine(request: Request,
-#                                 machine: str = Query(..., description="Machine to get records for"),
-#                                 start_date: str = Query(..., description="Start date of the reservation period"),
-#                                 end_date: str = Query(..., description="End date of the reservation period"),
-#                                 calendar: ReservationCalendar = Depends(get_calendar)):
-
-#     """
-#     This endpoint retrieves the reservations made for a machine
-#     in a particular date range. It returns an appropriate message
-#     if no such reservations are found.
-#     """
-#     try:
-#         if start_date and end_date:
-#             start = urllib.parse.unquote(start_date)
-#             end = urllib.parse.unquote(end_date)
-#             daterange = DateRange(start, end)
-#             reservations = calendar.retrieve_by_machine(daterange, machine)
-#         else:
-#             raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        
-#         log_operation(request.state.user,
-#                       "list reservations", 
-#                       f"Listed reservations for machine {machine}", 
-#                       datetime.now())
-        
-#         if reservations:
-#             return {"reservations":reservations}
-#         else:
-#             return {"message": "No reservations found for this machine."}
-       
-#     except Exception as e:
-#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                     detail=f'Failed to get reservations due to {e}')
-
-
-
-
-
-
 
 
 
@@ -502,14 +386,6 @@ async def remove_user(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to delete user due to {e}')
-
-
-
-
-
-
-
-
 
 
 patch_user_role_permissions = {
