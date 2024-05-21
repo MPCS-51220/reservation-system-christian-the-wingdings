@@ -136,7 +136,13 @@ async def login(userlog: UserLogin,
         
         # Raise a generic HTTPException with status code 500
         raise HTTPException(status_code=500, detail="Internal Server Error")
-        
+
+
+@app.post("/logout")
+@validate_user
+async def logout(request: Request):
+    log_operation(request.state.user, "logout", f"{request.state.user} logged out", datetime.now())
+    return {"message": "Logged out successfully"}
 
 
 add_user_permissions = {

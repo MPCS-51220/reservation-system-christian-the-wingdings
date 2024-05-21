@@ -109,7 +109,7 @@ $(document).ready(function() {
             .then(response => response.json())
             .then(data => {
                 if (data.access_token) {
-                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('token', data.access_token);
                     this.buildInterface(data.interface);
                     this.showOnly(this.menuContainer);
                 } else {
@@ -130,13 +130,39 @@ $(document).ready(function() {
                 menuItem.textContent = command.name;
                 menuItem.dataset.command = JSON.stringify(command);
                 menuItem.addEventListener('click', () => {
-                    this.executeCommand(command);
-                    this.highlightMenuItem(menuItem);
-                    this.showCommandAndHideResults();
+                    if (command.name.toLowerCase() === 'logout') {
+                        this.logout();
+                    } else {
+                        this.executeCommand(command);
+                        this.highlightMenuItem(menuItem);
+                        this.showCommandAndHideResults();
+                    }
                 });
                 menuContainer.appendChild(menuItem);
             });
             menuContainer.classList.remove('hide');
+        }
+
+        logout() {
+            const token = localStorage.getItem('token');
+            fetch('/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    localStorage.removeItem('token');
+                    window.location.href = '/';
+                } else {
+                    console.error('Logout failed');
+                }
+            })
+            .catch(error => {
+                console.error('Error during logout:', error);
+            });
         }
 
         executeCommand(command) {
@@ -204,7 +230,7 @@ $(document).ready(function() {
                 jsonData[key] = value;
             });
 
-            const accessToken = localStorage.getItem('access_token');
+            const accessToken = localStorage.getItem('token');
 
             let url = command.route;
             let fetchOptions = {
@@ -224,11 +250,9 @@ $(document).ready(function() {
                     }
                 });
                 url += '?' + new URLSearchParams(queryParams).toString();
-                console.log('GET/DELETE URL:', url);
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(jsonData);
-                console.log('POST/PUT URL:', url,', body:', fetchOptions.body);
             }
 
             fetch(url, fetchOptions)
