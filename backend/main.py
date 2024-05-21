@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException, status, Request, Query, Depends, Sec
 import urllib.parse
 import sqlite3
 from datetime import datetime
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from webbuilder import WebBuilder
 
 from fastapi.security.api_key import APIKeyHeader
 import requests
@@ -21,6 +25,8 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 TIMEZONE = "GMT-5"
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 def convert_timezone(date_string, from_timezone, to_timezone):
     """
@@ -41,27 +47,6 @@ def convert_timezone(date_string, from_timezone, to_timezone):
 
     # Format the datetime object back to string
     return datetime_obj.strftime('%Y-%m-%d %H:%M')
-
-def convert_timezone(date_string, from_timezone, to_timezone):
-    """
-    Converts a datetime string from one timezone to another ."""
-
-    # dateutil uses opposite sign conventions
-    if "+" in from_timezone:
-        from_timezone = from_timezone.replace("+","-")
-    else:
-        from_timezone = from_timezone.replace("-","+")
-    
-    datetime_obj = parser.parse(date_string + ' ' + from_timezone)
-
-    to_timezone = tz.gettz(to_timezone)
-
-    # Convert the datetime object to the target timezone
-    datetime_obj = datetime_obj.astimezone(to_timezone)
-
-    # Format the datetime object back to string
-    return datetime_obj.strftime('%Y-%m-%d %H:%M')
-
 
 def get_db_manager():
     return DatabaseManager('../reservationDB.db')
@@ -110,10 +95,18 @@ def log_operation(username, type, description, timestamp):
 
 
 @app.get("/")
-def root():
-    return {"message": "Hello World"}
+async def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/login-form", response_class=JSONResponse)
+async def get_login_form():
+    menu = WebBuilder()
+    menuJson = menu.build_menu()
+    if menuJson is not None:
+        return JSONResponse(content=menuJson)
+ 
+    return JSONResponse(content={"error": "Login form not found"}, status_code=404)
 
 
 @app.post("/login")
@@ -128,7 +121,11 @@ async def login(userlog: UserLogin,
                                                     })
         print(f"user: {user['username']}, role: {user['role']} logged in")
         log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
-        return {"access_token": access_token, "token_type": "bearer"}
+        
+        menu = WebBuilder(user['role'])
+        menuJson = menu.build_menu()
+        
+        return {"access_token": access_token, "token_type": "bearer", "interface": menuJson}
     
     except HTTPException as http_exc:
         raise http_exc
@@ -139,7 +136,13 @@ async def login(userlog: UserLogin,
         
         # Raise a generic HTTPException with status code 500
         raise HTTPException(status_code=500, detail="Internal Server Error")
-        
+
+
+@app.post("/logout")
+@validate_user
+async def logout(request: Request):
+    log_operation(request.state.user, "logout", f"{request.state.user} logged out", datetime.now())
+    return {"message": "Logged out successfully"}
 
 
 add_user_permissions = {
@@ -201,14 +204,15 @@ async def configure_business_rules(request: Request,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to update business rules due to {e}')
 
-
-def is_customer_accessing_own_data(user_username, customer_name):
-    return user_username == customer_name
+def is_customer_requesting_on_their_account(user_username, **kwargs):
+    reservation_request = kwargs.get('reservation_request')
+    customer_name = reservation_request.customer
+    return user_username == customer_name or customer_name is None
 
 add_reservation_permissions = {
     "admin": None,  # No additional checks needed for admin
     "scheduler": None,  # No additional checks needed for scheduler
-    "customer": is_customer_accessing_own_data  # Customers can only access their own data
+    "customer": is_customer_requesting_on_their_account  # Customers can only access their own data
 }
 
 
@@ -251,15 +255,21 @@ async def add_reservation(request: Request,
     status code of 201 if the reservation was made successfully or
     a status code of 500 if there was an error
     """
-    try:      
+    try:
+
+        if request.state.role == "customer" and reservation_request.customer is None:
+            reservation_request.customer = request.state.user
+
         if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user): #Need to come back to. 
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
+        
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
         reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date, business_manager)
 
         calendar.add_reservation(reservation)
+
         log_operation(request.state.user, 
                       "add reservation", 
                       f"reservation added for machine {reservation_request.machine}", 
@@ -271,108 +281,62 @@ async def add_reservation(request: Request,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
+def is_customer_accessing_own_data(user_username, **kwargs):
+    customer_name = kwargs.get('customer')
+    return user_username == customer_name or customer_name is None
 
-
-
-get_reservation_permissions = {
-    "admin": None,
-    "scheduler": None
-}
-
-@app.get("/reservations/customers", status_code=status.HTTP_200_OK)
-@validate_user
-@role_required(get_reservation_permissions)
-async def get_reservations_by_customer(request: Request,
-                                      customer: str = Query(..., description="Customer name"),
-                                      start_date: str = Query(..., description="Start date of the reservation period"),
-                                      end_date: str = Query(..., description="End date of the reservation period"),
-                                      calendar: ReservationCalendar = Depends(get_calendar)):
-    """
-    This endpoint retrieves the reservations made by a customer
-    in a particular date range. It returns an appropriate message
-    if no such reservations are found.
-    """
-    try:
-        if start_date and end_date:
-            start = urllib.parse.unquote(start_date)
-            end = urllib.parse.unquote(end_date)
-
-            daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_customer(daterange, customer)
-        else:
-            raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        log_operation(request.state.user,
-                      "list reservations", 
-                      f"Listed reservations for {customer}", 
-                      datetime.now())
-        
-        if reservations:
-            return {"reservations":reservations}
-        else:
-            return {"message": "No reservations found for this customer."}
-       
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f'Failed to get reservations due to {e}')
-
-
-
-
-
-
-
-
-
-
-get_reservation_by_machine_permissions = {
+get_reservations_prmissions = {
     "admin": None,
     "scheduler": None,
     "customer": is_customer_accessing_own_data
 }
 
-
-@app.get("/reservations/machines", status_code=status.HTTP_200_OK)
+@app.get("/reservations", status_code=status.HTTP_200_OK)
 @validate_user
-@role_required(get_reservation_by_machine_permissions)
-async def get_reservations_by_machine(request: Request,
-                                machine: str = Query(..., description="Machine to get records for"),
-                                start_date: str = Query(..., description="Start date of the reservation period"),
-                                end_date: str = Query(..., description="End date of the reservation period"),
-                                calendar: ReservationCalendar = Depends(get_calendar)):
-
-    """
-    This endpoint retrieves the reservations made for a machine
-    in a particular date range. It returns an appropriate message
-    if no such reservations are found.
-    """
+@role_required(get_reservations_prmissions)
+async def get_reservations(request: Request,
+                           customer: str = Query(None, description="Customer name"),
+                           machine: str = Query(None, description="Machine to get records for"),
+                           start_date: str = Query(..., description="Start date of the reservation period"),
+                           end_date: str = Query(..., description="End date of the reservation period"),
+                           calendar: ReservationCalendar = Depends(get_calendar)):
     try:
-        if start_date and end_date:
-            start = urllib.parse.unquote(start_date)
-            end = urllib.parse.unquote(end_date)
-            daterange = DateRange(start, end)
-            reservations = calendar.retrieve_by_machine(daterange, machine)
-        else:
+        if request.state.role == "customer" and customer is None:
+            customer = request.state.user
+
+        if not start_date or not end_date:
             raise HTTPException(status_code=400, detail="Both start and end dates are required")
-        
-        log_operation(request.state.user,
-                      "list reservations", 
-                      f"Listed reservations for machine {machine}", 
-                      datetime.now())
-        
-        if reservations:
-            return {"reservations":reservations}
+
+        start = urllib.parse.unquote(start_date)
+        end = urllib.parse.unquote(end_date)
+        daterange = DateRange(start, end)
+
+        if customer and machine:
+            reservations = calendar.retrieve_by_machine_and_customer(daterange, machine, customer)
+            logstring = f'Listed reservations for customer: {customer}, machine: {machine}'
+        elif customer:
+            reservations = calendar.retrieve_by_customer(daterange, customer)
+            logstring = f'Listed reservations for customer: {customer} in daterange: {daterange}'
+        elif machine:
+            reservations = calendar.retrieve_by_machine(daterange, machine)
+            logstring = f'Listed reservations for machine: {machine} in daterange: {daterange}'
         else:
-            return {"message": "No reservations found for this machine."}
-       
+            reservations = calendar.retrieve_by_date(daterange)
+            logstring = f'Listed reservations in daterange: {daterange}'
+
+        log_operation(request.state.user,
+                      "list reservations",
+                      logstring,
+                      datetime.now())
+
+        if reservations:
+            return {"reservations": reservations}
+        else:
+            return {"message": "No reservations found for the given criteria."}
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f'Failed to get reservations due to {e}')
-
-
-
-
-
-
+                            detail=f'Failed to get reservations due to {e}')
 
 
 
@@ -436,14 +400,6 @@ async def remove_user(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to delete user due to {e}')
-
-
-
-
-
-
-
-
 
 
 patch_user_role_permissions = {
@@ -618,7 +574,7 @@ async def handle_requests(request:Request, remote_request: RemoteRequest,
    
 del_remote_reservation_permissions = {
     "admin": None,
-    "scheduler": None,
+    "scheduler": None
 }
 
 

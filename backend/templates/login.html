@@ -1,0 +1,10 @@
+<!-- login.html -->
+{% extends "base.html" %}
+{% block content %}
+<form id="login-form">
+    <input type="text" name="username" placeholder="Username">
+    <input type="password" name="password" placeholder="Password">
+    <button type="submit">Login</button>
+</form>
+<script src="/static/js/auth.js"></script>
+{% endblock %}
