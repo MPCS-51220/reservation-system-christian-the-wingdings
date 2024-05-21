@@ -198,14 +198,15 @@ async def configure_business_rules(request: Request,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to update business rules due to {e}')
 
-
-def is_customer_accessing_own_data(user_username, customer_name):
-    return user_username == customer_name
+def is_customer_requesting_on_their_account(user_username, **kwargs):
+    reservation_request = kwargs.get('reservation_request')
+    customer_name = reservation_request.customer
+    return user_username == customer_name or customer_name is None
 
 add_reservation_permissions = {
     "admin": None,  # No additional checks needed for admin
     "scheduler": None,  # No additional checks needed for scheduler
-    "customer": is_customer_accessing_own_data  # Customers can only access their own data
+    "customer": is_customer_requesting_on_their_account  # Customers can only access their own data
 }
 
 
@@ -248,15 +249,21 @@ async def add_reservation(request: Request,
     status code of 201 if the reservation was made successfully or
     a status code of 500 if there was an error
     """
-    try:      
+    try:
+
+        if request.state.role == "customer" and reservation_request.customer is None:
+            reservation_request.customer = request.state.user
+
         if not user_manager.is_user_active(reservation_request.customer) or not user_manager.is_user_active(request.state.user): #Need to come back to. 
             # reservation cannot be made by/for deactivated users
             raise HTTPException(status_code=400, 
                                 detail="This user is deactivated and cannot make reservations.")
+        
         reservation_date = DateRange(reservation_request.start_date, reservation_request.end_date)
         reservation = Reservation(reservation_request.customer, reservation_request.machine, reservation_date, business_manager)
 
         calendar.add_reservation(reservation)
+
         log_operation(request.state.user, 
                       "add reservation", 
                       f"reservation added for machine {reservation_request.machine}", 
@@ -268,6 +275,9 @@ async def add_reservation(request: Request,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
+def is_customer_accessing_own_data(user_username, **kwargs):
+    customer_name = kwargs.get('customer')
+    return user_username == customer_name or customer_name is None
 
 get_reservations_prmissions = {
     "admin": None,
@@ -285,9 +295,7 @@ async def get_reservations(request: Request,
                            end_date: str = Query(..., description="End date of the reservation period"),
                            calendar: ReservationCalendar = Depends(get_calendar)):
     try:
-        if request.state.role == "customer":
-            if customer and customer != request.state.user:
-                raise HTTPException(status_code=403, detail="Customers can only access their own data.")
+        if request.state.role == "customer" and customer is None:
             customer = request.state.user
 
         if not start_date or not end_date:
@@ -560,7 +568,7 @@ async def handle_requests(request:Request, remote_request: RemoteRequest,
    
 del_remote_reservation_permissions = {
     "admin": None,
-    "scheduler": None,
+    "scheduler": None
 }
 
 

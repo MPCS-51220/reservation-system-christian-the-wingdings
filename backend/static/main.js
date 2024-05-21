@@ -228,6 +228,7 @@ $(document).ready(function() {
             } else {
                 fetchOptions.headers['Content-Type'] = 'application/json';
                 fetchOptions.body = JSON.stringify(jsonData);
+                console.log('POST/PUT URL:', url,', body:', fetchOptions.body);
             }
 
             fetch(url, fetchOptions)

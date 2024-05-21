@@ -66,9 +66,11 @@ def role_required(roles_permissions: dict):
             try:
                 if role in roles_permissions.keys():
                     condition = roles_permissions[role]
-                    if condition is None or condition(user *args, **kwargs):
+                    if condition is None or condition(user, **kwargs):
                         return await f(*args, **kwargs)
             except Exception as e:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+                print(e)
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f'Forbidden {e}')
+
         return wrapper
     return decorator

@@ -189,7 +189,6 @@ class DatabaseManager:
         if not hasattr(self, 'initialized'):
             self.db_path = db_path
             self.initialized = True
-            print(f"Database Manager initialized at path: {self.db_path}")
 
     @contextmanager
     def get_connection(self):
@@ -223,7 +222,7 @@ class DatabaseManager:
                     conn.commit()
                     rows = cursor.fetchall()
                     if rows:
-                        print(f'Get Connection returned: {[dict(zip([column[0] for column in cursor.description], row)) for row in rows]}')
+                        # print(f'Get Connection returned: {[dict(zip([column[0] for column in cursor.description], row)) for row in rows]}')
                         return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
                     return []
                 except sqlite3.Error as e:
@@ -272,7 +271,6 @@ class BusinessManager:
         
         if row:
             row = row[0]  # Get the first row
-            print(f'Row: {row} for load_business_rules')
             # Create instance attributes for each column
             for column_name in column_names:
                 setattr(self, column_name, row[column_name])
