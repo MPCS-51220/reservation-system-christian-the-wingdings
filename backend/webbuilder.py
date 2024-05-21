@@ -80,7 +80,7 @@ class WebBuilder:
                 ]
             },
             {
-                "name": "List Reservations", # by customer and date",
+                "name": "List Reservations", # by customer_machine and date",
                 "roles": ["admin", "scheduler", "customer"],
                 "route": "/reservations",
                 "method": "GET",
@@ -118,42 +118,8 @@ class WebBuilder:
                 ]
             },
             {
-                "name": "List reservations by machine and date",
-                "roles": ["admin", "scheduler", "customer"],
-                "route": "/reservations/machines",
-                "method": "GET",
-                "inputs": [
-                    {
-                        "prompt": "Enter start date (YYYY-MM-DD)",
-                        "tag": "start_date",
-                        "validate": "date",
-                        "error_message": "Invalid start date. Please try again."
-                    },
-                    {
-                        "prompt": "Enter end date (YYYY-MM-DD)",
-                        "tag": "end_date",
-                        "validate": "date",
-                        "error_message": "Invalid end date. Please try again."
-                    },
-                    {
-                        "prompt": "Select the machine type",
-                        "tag": "machine",
-                        "validate": "enum",
-                        "options": ["scanner", "Type B", "Type C"],
-                        "error_message": "Invalid machine type selected. Please try again."
-                    }
-                    # {
-                    #     "prompt": "Enter customer name",
-                    #     "roles": ["admin", "scheduler"],
-                    #     "tag": "customer_name",
-                    #     "validate": "string",
-                    #     "error_message": "Invalid name entered. Please try again."
-                    # }
-                ]
-            },
-            {
                 "name": "Reset Password",
-                "roles": ["admin", "customer"],
+                "roles": ["admin", "scheduler","customer"],
                 "route": "/users/password",
                 "method": "PATCH",
                 "inputs": [
@@ -185,12 +151,6 @@ class WebBuilder:
             {
                 "name": "Logout",
                 "route": "/logout",
-                "method": "POST",
-                "roles": ["admin", "scheduler", "customer"]
-            },
-            {
-                "name": "Exit",
-                "route": "/exit",
                 "method": "POST",
                 "roles": ["admin", "scheduler", "customer"]
             },
