@@ -267,7 +267,7 @@ async def add_reservation(request: Request,
         return {"message": "Reservation added successfully!"}
    
     except Exception as e:
-        # attempt_remote_reservation(reservation)
+        # attempt_remote_reservation(reservation) # change this to catch specific error of no availability
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
