@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status, Request, Query, Depends
+from fastapi import FastAPI, HTTPException, status, Request, Query, Depends, Security
 import urllib.parse
 import sqlite3
 from datetime import datetime
@@ -7,17 +7,66 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from webbuilder import WebBuilder
 
+from fastapi.security.api_key import APIKeyHeader
+import requests
+from dateutil import parser, tz
 
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, BusinessManager, DateRange, DatabaseManager
 from token_manager import create_access_token
 
-from schema import Reservation_Req, User, UserRole, UserLogin, Activation, BusinessRule
+from schema import Reservation_Req, User, UserRole, UserLogin, Activation, BusinessRule, RemoteRequest
 
+API_KEY_NAME = "API-Key"
+API_KEY = "b456e6d5ae43d16ce9d9e1fe2d5014258ccc73f12c237368400e6528a217af59" 
+
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+TIMEZONE = "GMT-5"
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+def convert_timezone(date_string, from_timezone, to_timezone):
+    """
+    Converts a datetime string from one timezone to another ."""
+
+    # dateutil uses opposite sign conventions
+    if "+" in from_timezone:
+        from_timezone = from_timezone.replace("+","-")
+    else:
+        from_timezone = from_timezone.replace("-","+")
+    
+    datetime_obj = parser.parse(date_string + ' ' + from_timezone)
+
+    to_timezone = tz.gettz(to_timezone)
+
+    # Convert the datetime object to the target timezone
+    datetime_obj = datetime_obj.astimezone(to_timezone)
+
+    # Format the datetime object back to string
+    return datetime_obj.strftime('%Y-%m-%d %H:%M')
+
+def convert_timezone(date_string, from_timezone, to_timezone):
+    """
+    Converts a datetime string from one timezone to another ."""
+
+    # dateutil uses opposite sign conventions
+    if "+" in from_timezone:
+        from_timezone = from_timezone.replace("+","-")
+    else:
+        from_timezone = from_timezone.replace("-","+")
+    
+    datetime_obj = parser.parse(date_string + ' ' + from_timezone)
+
+    to_timezone = tz.gettz(to_timezone)
+
+    # Convert the datetime object to the target timezone
+    datetime_obj = datetime_obj.astimezone(to_timezone)
+
+    # Format the datetime object back to string
+    return datetime_obj.strftime('%Y-%m-%d %H:%M')
 
 
 def get_db_manager():
@@ -180,6 +229,32 @@ add_reservation_permissions = {
     "customer": is_customer_accessing_own_data  # Customers can only access their own data
 }
 
+
+# def attempt_remote_reservation(reservation):
+#     try:
+#         data={
+#             "start_time":reservation.daterange.start_date,
+#             "end_time":reservation.daterange.end_date,
+#             "client_name":reservation.customer,
+#             "machine_name":reservation.machine,
+#             "time_zone":"GMT-5",
+#             "blocks":"Null"
+#         }
+
+#         remote_endpoints = [] # store urls for the 3 teams' endpoints here
+#         headers={"API-Key":API_KEY}
+#         for url in remote_endpoints:
+#             response = requests.post(url, headers=headers,json=data)
+#             if response.json()['reservation_made_success']:
+#                 return {"message": "Reservation added successfully at a remote facility!"}
+    
+#         return {"message":"Reservation was not made due to unavailable resources"}
+    
+#     except Exception as e:
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                              detail=f'Failed to add reservation due to {e}')
+
+
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
 @validate_user
 @role_required(add_reservation_permissions)
@@ -210,6 +285,7 @@ async def add_reservation(request: Request,
         return {"message": "Reservation added successfully!"}
    
     except Exception as e:
+        # attempt_remote_reservation(reservation) # change this to catch specific error of no availability
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
@@ -561,4 +637,96 @@ async def list_users(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to list users due to {e}')
+    
+
+def api_key_auth(api_key: str = Security(api_key_header)):
+    if api_key == API_KEY:
+        return api_key
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid API key"
+        )
+
+
+@app.post("/outside-requests")
+async def handle_requests(request:Request, remote_request: RemoteRequest, 
+                          calendar: ReservationCalendar = Depends(get_calendar),
+                          api_key: str = Depends(api_key_auth),
+                          business_manager: BusinessManager = Depends(get_business_manager)
+                          ):
+    try:
+        # convert start_time and end_time to correct timezone
+        start_time = convert_timezone(remote_request.start_time, 
+                                      remote_request.time_zone,
+                                      TIMEZONE)
+        end_time = convert_timezone(remote_request.end_time, 
+                                    remote_request.time_zone,
+                                    TIMEZONE)
+        
+        reservation_date = DateRange(start_time, end_time)
+        reservation = Reservation(remote_request.client_name, 
+                                  remote_request.machine_name, 
+                                  reservation_date,
+                                  business_manager)
+        
+        calendar.add_reservation(reservation, True)
+        return {"reservation_made_success":True,
+                "message":f"({reservation.cost},{reservation.down_payment})"} 
+    
+    except Exception as e:
+        return {"reservation_made_success":False,
+                "message":f"{e}"}
+    
+
+
+
    
+del_remote_reservation_permissions = {
+    "admin": None,
+    "scheduler": None,
+}
+
+
+@app.delete("/reservations/remote", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(del_remote_reservation_permissions)
+async def cancel_remote_reservation(request: Request,
+                             reservation_id: str = Query(..., description="Reservation ID"),
+                             calendar: ReservationCalendar = Depends(get_calendar)):
+
+   
+    try:
+        refund = calendar.remove_remote_reservation(reservation_id)
+        print(f'refund: {refund} in cancel_reservation')
+        if refund is not False: # reservation was removed and refund amount returned
+            return {"message": "Reservation cancelled successfully", "refund": refund}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Reservation not found")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to cancel reservation due to {e}')
+    
+
+list_remote_reservations_permissions = {
+    "admin":None,
+    "scheduler":None
+}
+
+@app.get("/reservations/remote", status_code=status.HTTP_200_OK)
+@validate_user
+@role_required(list_remote_reservations_permissions)
+async def list_remote(request: Request,
+                     calendar: ReservationCalendar = Depends(get_calendar)):
+
+
+    try:
+        reservations = calendar.list_remote_reservations()
+        if reservations:
+            return {"reservations":reservations}
+        else:
+            return {"message": "No remote reservations"}
+   
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to list reservations due to {e}')

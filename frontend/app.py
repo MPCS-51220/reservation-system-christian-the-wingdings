@@ -319,7 +319,30 @@ menu = {
                 "route": "/users",
                 "inputs":[],
                 "method": "GET",
+            },
+            {
+                "name": "List reservations made for other facilities",
+                "roles": ["admin","scheduler"],
+                "route": "/reservations/remote",
+                "inputs":[],
+                "method": "GET",
+            },
+            {
+                "name": "Cancel reservations made for other facilities",
+                "roles": ["admin","scheduler"],
+                "route": "/reservations/remote",
+                "inputs":[
+                    {
+                        "prompt": "Enter the reservation ID to cancel",
+                        "tag": "reservation_id",
+                        "validate": "integer",
+                        "error_message": "Invalid reservation ID. Please enter a positive integer."
+                    }
+                ],
+                "method": "DELETE",
             }
+
+
 
 
         ]

@@ -45,3 +45,13 @@ INSERT INTO Machine (machine_id, name, quantity, cooldown, rate) VALUES
 
 INSERT INTO Machine (machine_id, name, quantity, cooldown, rate) VALUES
 (3, 'harvester', 1, 360, 88000.0);
+
+ CREATE TABLE Remote_Reservation(
+    reservation_id INTEGER PRIMARY KEY, 
+    customer TEXT NOT NULL,  
+    machine_name TEXT NOT NULL, 
+    start_date DATETIME NOT NULL, 
+    end_date DATETIME NOT NULL, 
+    total_cost REAL NOT NULL,  
+    down_payment REAL NOT NULL
+);

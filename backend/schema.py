@@ -45,3 +45,12 @@ class BusinessRule(BaseModel):
 
 class Activation(BaseModel):
     username:str
+
+class RemoteRequest(BaseModel):
+    start_time:str
+    end_time:str
+    client_name:str
+    machine_name:str
+    time_zone:str
+    blocks:str
+
