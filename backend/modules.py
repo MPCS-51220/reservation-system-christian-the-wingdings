@@ -153,10 +153,10 @@ class UserManager:
             query = "SELECT is_active FROM User WHERE username = ?"
             user = self.db_manager.execute_query(query, (username,))
             print(f"User: {user}")
-            # if user:
-            # and user['is_active']:
-            return True
-            # return False
+            if user:
+             if user[0]['is_active']:
+                return True
+            return False
         
         except sqlite3.Error as e:
             print("Database error: ",str(e))
@@ -527,26 +527,33 @@ class ReservationCalendar:
             print(f"Error: {e}")
             raise
 
+    def list_remote_reservations(self):
+
+        query = "SELECT * FROM Remote_Reservation"
+        result = self.db_manager.execute_query(query)
+        return result
+
+
     
-    def retrieve_by_machine_and_customer(self, daterange, machine, customer):
-        final_reservations = []
+    # def retrieve_by_machine_and_customer(self, daterange, machine, customer):
+    #     final_reservations = []
     
-        for reservation in self.reservations.values():
-            if (reservation.machine == machine and 
-                reservation.customer == customer and 
-                reservation.daterange.start_date <= daterange.end_date and 
-                reservation.daterange.end_date >= daterange.start_date):
-                final_reservations.append(reservation)
+    #     for reservation in self.reservations.values():
+    #         if (reservation.machine == machine and 
+    #             reservation.customer == customer and 
+    #             reservation.daterange.start_date <= daterange.end_date and 
+    #             reservation.daterange.end_date >= daterange.start_date):
+    #             final_reservations.append(reservation)
         
-        return final_reservations
+    #     return final_reservations
     
     
-    def add_reservation(self, reservation):
+    def add_reservation(self, reservation, outside_reservation=False):
         try:
             machine_id = self._get_Machine_id(reservation)
             self._verify_business_hours(reservation)
             self._check_equipment_availability(reservation)
-            self._save_reservation(reservation, machine_id)
+            self._save_reservation(reservation, machine_id, outside_reservation)
         except ValueError as e:
             print(f"Error: {e}")
             raise
@@ -620,6 +627,48 @@ class ReservationCalendar:
 
         except sqlite3.Error as e:
             print("Database error: ", str(e))
+
+    def remove_remote_reservation(self, reservation_id):
+        try:
+            # Query to get the reservation details for the given reservation_id
+            query = """
+                SELECT 
+                start_date, 
+                end_date,
+                down_payment,
+                machine_name 
+                FROM Remote_Reservation
+                WHERE reservation_id = ?
+            """
+            
+            # Execute the query using the DatabaseManager
+            result = self.db_manager.execute_query(query, (reservation_id,))
+            if result:  # Check if reservation exists
+                start_date = result[0]['start_date']
+                end_date = result[0]['end_date']
+                machine_name = result[0]['machine_name']
+                # Create a Reservation instance
+                start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d %H:%M')
+                end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d %H:%M')
+                daterange = DateRange(start_date, end_date)  # Corrected order of arguments
+
+                reservation = Reservation(
+                    customer_name="", # Not needed for refund calculation
+                    machine_name=machine_name,
+                    daterange=daterange,
+                    business_manager=self.biz_manager
+                    )
+                # Calculate the refund using the Reservation class method
+                refund = reservation.calculate_refund()
+                # Query to delete the reservation
+                delete_query = "DELETE FROM Remote_Reservation WHERE reservation_id = ?"
+                self.db_manager.execute_statement(delete_query, (reservation_id,))
+                return refund
+            
+            return False
+
+        except sqlite3.Error as e:
+            print("Database error: ", str(e))
             
     def _get_Machine_id(self, reservation):
         try:
@@ -633,19 +682,34 @@ class ReservationCalendar:
             print("Database error: ", str(e))
             raise
 
-    def _save_reservation(self, reservation, machine_id):
+    def _save_reservation(self, reservation, machine_id, outside_reservation):
         try:
-            reservation_query = """
+            if not outside_reservation:
+                reservation_query = """
                 INSERT INTO Reservation (customer, machine_id, 
                 start_date, end_date, total_cost, down_payment) 
                 VALUES (?, ?, ?, ?, ?, ?)
                 """
-            self.db_manager.execute_statement(reservation_query, (
-                reservation.customer, machine_id,
-                reservation.daterange.start_date,
-                reservation.daterange.end_date,
-                reservation.cost, reservation.down_payment
-            ))
+                self.db_manager.execute_statement(reservation_query, (
+                    reservation.customer, machine_id,
+                    reservation.daterange.start_date,
+                    reservation.daterange.end_date,
+                    reservation.cost, reservation.down_payment
+                ))
+            
+            else: # store remote reservation in different table
+                reservation_query = """
+                INSERT INTO Remote_Reservation (customer, machine_name, 
+                start_date, end_date, total_cost, down_payment) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
+                self.db_manager.execute_statement(reservation_query, (
+                    reservation.customer, reservation.machine,
+                    reservation.daterange.start_date,
+                    reservation.daterange.end_date,
+                    reservation.cost, reservation.down_payment
+                ))
+
         except sqlite3.Error as e:
             print("Database error: ", str(e))
             raise
