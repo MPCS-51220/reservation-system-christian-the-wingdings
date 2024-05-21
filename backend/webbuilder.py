@@ -50,7 +50,7 @@ class WebBuilder:
                         "prompt": "Select the machine type",
                         "tag": "machine",
                         "validate": "enum",
-                        "options": ["Scanner", "Scooper", "Harvester"],
+                        "options": ["scanner", "scooper", "harvester"],
                         "optional": False,
                         "error_message": "Invalid machine type selected. Please try again."
                     },
@@ -227,21 +227,21 @@ class WebBuilder:
                     }
                 ]
             },
-            {
-                "name": "Reset Password",
-                "roles": ["admin"],
-                "route": "/users/password",
-                "method": "PATCH",
-                "inputs": [
-                    {
-                        "prompt": "Enter username for password reset",
-                        "tag": "username",
-                        "validate": "string",
-                        "optional": False,
-                        "error_message": "Invalid username. Please try again."
-                    }
-                ]
-            },
+            # {
+            #     "name": "Reset Password",
+            #     "roles": ["admin"],
+            #     "route": "/users/password",
+            #     "method": "PATCH",
+            #     "inputs": [
+            #         {
+            #             "prompt": "Enter username for password reset",
+            #             "tag": "username",
+            #             "validate": "string",
+            #             "optional": False,
+            #             "error_message": "Invalid username. Please try again."
+            #         }
+            #     ]
+            # },
             {
                 "name": "Configure Business Rules",
                 "roles": ["admin"],
