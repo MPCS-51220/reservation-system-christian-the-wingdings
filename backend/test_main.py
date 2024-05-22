@@ -237,6 +237,17 @@ def test_remove_reservation_fail(setup_db, transaction, calendar):
     assert result is not None
     assert result == False
 
+def test_get_rule(setup_db, biz_manager):
+    value = biz_manager.get_rule("week_refund")
+    assert value is not None
+    assert isinstance(value, float)
+
+def test_get_rule_fale(setup_db, biz_manager):
+    with pytest.raises(AssertionError):
+        value = biz_manager.get_rule("harvester_price")
+        assert value is not None
+        assert isinstance(value, str)
+
 
 
 

@@ -148,14 +148,13 @@ menu = {
             },
             {
                 "name": "Change My Password",
-                "roles": ["admin", "customer"],
+                "roles": ["admin", "scheduler", "customer"],
                 "route": "/users/password",
                 "method": "PATCH",
                 "inputs": [
                     {
-                        "prompt": "Enter the username of the user you would like to change the password for",
+                        "prompt": "Enter your username to confirm who will be reset",
                         "tag": "username",
-                        "roles": ["admin"],
                         "validate": "string",
                         "error_message": "Invalid string format. Please try again."
                     },
@@ -164,13 +163,13 @@ menu = {
                         "tag": "password",
                         "validate": "password",
                         "error_message": "Invalid password format. Please try again."
-                    },
-                    {
-                        "prompt": "Enter a salt",
-                        "tag": "salt",
-                        "validate": "string",
-                        "error_message": "Invalid salt format. Please try again."
-                    }
+                    }#,
+                    #{
+                    #    "prompt": "Enter a salt",
+                    #    "tag": "salt",
+                    #    "validate": "string",
+                    #    "error_message": "Invalid salt format. Please try again."
+                    #}
                 ]
             },
             {
@@ -340,6 +339,26 @@ menu = {
                     }
                 ],
                 "method": "DELETE",
+            },
+            {
+                "name": "Change Temporary Password",
+                "roles": ["admin", "scheduler", "customer"],
+                "route": "/users/temp-password",
+                "method": "PATCH",
+                "inputs": [
+                    {
+                        "prompt": "Enter your username to confirm who will be reset",
+                        "tag": "username",
+                        "validate": "string",
+                        "error_message": "Invalid string format. Please try again."
+                    },
+                    {
+                        "prompt": "Enter your new password",
+                        "tag": "password",
+                        "validate": "password",
+                        "error_message": "Invalid password format. Please try again."
+                    }
+                ]
             }
 
 
