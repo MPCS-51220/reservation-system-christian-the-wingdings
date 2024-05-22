@@ -16,7 +16,7 @@ class UserLogin(BaseModel):
         
 class User(BaseModel):
     username: Optional[str] = None
-    password: str
+    password: Optional[str] = None
     role: Optional[str] = None
     salt: Optional[str] = None
 

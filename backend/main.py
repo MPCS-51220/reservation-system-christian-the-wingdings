@@ -10,6 +10,7 @@ from webbuilder import WebBuilder
 from fastapi.security.api_key import APIKeyHeader
 import requests
 from dateutil import parser, tz
+import os
 
 from permissions import validate_user, role_required
 from modules import Reservation, ReservationCalendar, UserManager, BusinessManager, DateRange, DatabaseManager
@@ -116,6 +117,9 @@ async def login(userlog: UserLogin,
         user = user_manager.authenticate_user(userlog.username, userlog.password)
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
+        if user and userlog.password == 'temp':
+            print("Cannot use temp password. Use 'Change temporary password' to fix this.")
+            raise HTTPException(status_code=401, detail="Cannot use temp password. Use 'Change temporary password' to fix this.")
         access_token = create_access_token(data={"sub": user['username'],
                                                     "role": user['role']
                                                     })
@@ -446,8 +450,41 @@ async def update_user_password(request: Request,
         if request.state.role == "customer":
             user_request.username = request.state.user
 
+        if user_request.salt == None and user_request.password == None:
+            user_request.salt = "random_salt"
+            user_request.password = "temp"
+        elif user_request.salt == None:
+            user_request.salt = os.urandom(32).hex()
+
         user_manager.update_password(user_request.username, user_request.password, user_request.salt)
         log_operation(request.state.user,
+                      "change user password", 
+                      f"Password changed for {user_request.username}", 
+                      datetime.now())
+        return {"message": f"password for {user_request.username} was changed successfully"}
+
+
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Failed to update password due to {e}')
+    
+
+@app.patch("/users/temp-password", status_code=status.HTTP_200_OK)
+async def update_temp_password(request: Request,
+                         user_request: User,
+                         user_manager: UserManager = Depends(get_user_manager)):
+    try:
+        #if request.state.role == "customer":
+        #    user_request.username = request.state.user
+
+        if user_request.salt == None and user_request.password == None:
+            user_request.salt = "random_salt"
+            user_request.password = "temp"
+        elif user_request.salt == None:
+            user_request.salt = os.urandom(32).hex()
+
+        user_manager.update_password(user_request.username, user_request.password, user_request.salt)
+        log_operation(user_request.username,
                       "change user password", 
                       f"Password changed for {user_request.username}", 
                       datetime.now())
