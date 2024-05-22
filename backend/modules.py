@@ -15,22 +15,14 @@ class UserManager:
         db_path (str): Path to the database file.
         db_manager (DatabaseManager): An instance of the DatabaseManager class.
         
-        
-    Methods:
-        add_user(username, password, role, salt): Adds a new user to the database.
-        hash_password(password, salt): Hashes a password using PBKDF2.
-        get_user(username): Retrieves a user from the database.
-        verify_password(plain_password, password_hash, salt): Verifies a password against a hash.
-        authenticate_user(username, password): Authenticates a user using a username and password.
-        update_password(username, password, salt): Updates a user's password in the database.
     '''
 
     def __init__(self, DatabaseManager, db_connection=None):
         self.db_manager = DatabaseManager
-        # self.db_connection = db_connection or sqlite3.connect('../reservationDB.db', check_same_thread=False)
-        # print(f"Database connection established at: {self.db_connection}")
+        
 
     def add_user(self, username, password, role, salt):
+        """Adds a new user to the database"""
         try:
             password_hash = self.hash_password(password, salt)
             query = "INSERT INTO User (username, password_hash, role, salt) VALUES (?, ?, ?, ?)"
@@ -44,17 +36,12 @@ class UserManager:
             raise e
 
     def hash_password(self, password, salt):
+        """Hashes a password using PBKDF2"""
         return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
     def get_user(self, username):
         """Retrieve user details from the database."""
-        # with self.db_connection as conn:
-        #     cursor = conn.cursor()
-        #     cursor.execute("SELECT username, password_hash, role, salt FROM User WHERE username = ?", (username,))
-        #     row = cursor.fetchone()
-        #     if row:
-        #         return {"username": row[0], "password_hash": row[1], "role": row[2], "salt": row[3]}
-        #     return None
+        
         query = "SELECT username, password_hash, role, salt FROM User WHERE username = ?"
         try:
             result = self.db_manager.execute_query(query, (username,))
@@ -66,6 +53,7 @@ class UserManager:
 
     def verify_password(self, plain_password, password_hash, salt):
         """Verify a plaintext password against the hashed version."""
+
         if password_hash == self.hash_password(plain_password, salt):
             return True
         else:
@@ -73,6 +61,7 @@ class UserManager:
 
     def authenticate_user(self, username: str, password: str):
         """Authenticate a user using username and password."""
+
         user = self.get_user(username)
         if user and self.verify_password(password, user['password_hash'], user['salt']):
             return user
@@ -80,6 +69,7 @@ class UserManager:
 
     def update_password(self, username, password, salt):
         """Update a user's password in the database."""
+
         password_hash = self.hash_password(password, salt)
         try:
             password_hash = self.hash_password(password, salt)
@@ -92,6 +82,7 @@ class UserManager:
     
     
     def update_user_role(self, new_role, username):
+        """Update a user's role in the database"""
         try:
             query = "UPDATE User SET role = ? WHERE username = ?"
             params = (new_role, username)
@@ -102,6 +93,7 @@ class UserManager:
             raise
     
     def remove_user(self, username):
+        """Remove a user from the database"""
 
         try:
             query = "DELETE FROM User WHERE username = ?"
@@ -228,7 +220,6 @@ class DatabaseManager:
                     conn.commit()
                     rows = cursor.fetchall()
                     if rows:
-                        # print(f'Get Connection returned: {[dict(zip([column[0] for column in cursor.description], row)) for row in rows]}')
                         return [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
                     return []
                 except sqlite3.Error as e:
@@ -261,11 +252,19 @@ class DatabaseManager:
 
 
 class BusinessManager:
+    """
+    A class to manage business rules of the facility
+
+    Attributes:
+    db_manager : DatabaseManager
+    """
     def __init__(self, db_manager):
         self.db_manager = db_manager
         self.load_business_rules()
 
     def load_business_rules(self):
+        """Load business rules values form database"""
+
         # Get the column names from the BusinessRules table
         query = "PRAGMA table_info(BusinessRules)"
         column_info = self.db_manager.execute_query(query)
@@ -282,9 +281,11 @@ class BusinessManager:
                 setattr(self, column_name, row[column_name])
 
     def get_rule(self, field_name):
+        """Get the value of a business rule"""
         return getattr(self, field_name, None)
 
     def update_rule(self, field_name, value):
+        """Update the value of a business rule"""
         setattr(self, field_name, value)
         query = f"UPDATE BusinessRules SET {field_name} = ? WHERE rowid = 1"
         self.db_manager.execute_statement(query, (value,))
@@ -324,6 +325,7 @@ class Reservation:
 
 
     def calculate_cost(self):
+        """Calculate cost of the reservation"""
         if self.machine == "harvester":
             return self.biz_manager.harvester_price
         if self.machine == "scooper": 
@@ -339,10 +341,12 @@ class Reservation:
             return 0
     
     def calculate_down_payment(self):
+        """Calculate down payment for the reservation"""
         return self.cost * 0.5
 
 
     def calculate_refund(self):
+        """Calculate refund for the cancelled reservation"""
         # calculate refund based on number of advance days of cancellation
         start_date = self.daterange.start_date
         
@@ -380,75 +384,10 @@ class ReservationCalendar:
         self.db_manager = DatabaseManager
         self.biz_manager = BusinessManager(DatabaseManager)
 
-    '''def update_settings(self, **kwargs): 
-        """
-        Updates the settings of the reservation calendar dynamically.
-        Accepted kwargs: harvester_price, scooper_price_per_hour, scanner_price_per_hour,
-                         number_of_scoopers, number_of_scanners, weekday_hours, weekend_hours.
-        """
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            else:
-                raise AttributeError(f"'ReservationCalendar' object has no attribute '{key}'")''' # This is not needed anymore its just a block quote
 
-    # def get_db(self):
-    #     """
-    #     Connect to database
-    #     """
-    #     try:
-    #         conn = sqlite3.connect('../reservationDB.db')
-    #         conn.row_factory = sqlite3.Row
-    #         return conn
-    #     except sqlite3.Error as e:
-    #         print("Error while connecting to database: ",str(e))
-    #         raise
-
-    # def login(self, login_username):
-
-    #     try:
-    #         conn = self.get_db()
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT password_hash, salt, role FROM User WHERE username = ?", (login_username,))
-    #         user = cursor.fetchone()
-    #         conn.close()
-    #         return user
-               
-    #     except sqlite3.Error as e:
-    #         print("Database error: ",str(e))
-    #         raise
-
-    # def retrieve_admin_check(self, username):
-
-    #     try:
-    #         conn = self.get_db()
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT COUNT(*) FROM User WHERE role = 'admin'")
-    #         count = cursor.fetchone()[0]
-    #         cursor.execute("SELECT role FROM User WHERE username = ?", (username,))
-    #         user_role = cursor.fetchone()[0]
-    #         conn.close()
-    #         return count, user_role
-               
-    #     except sqlite3.Error as e:
-    #         print("Database error: ",str(e))
-    #         raise
-
-    # def retrieve_by_id(self, reservation_id):
-
-    #     try:
-    #         conn = self.get_db()
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT customer FROM Reservation WHERE reservation_id = ?", (reservation_id,))
-    #         reserv = cursor.fetchone()
-    #         conn.close()
-    #         return reserv
-               
-    #     except sqlite3.Error as e:
-    #         print("Database error: ",str(e))
-    #         raise
 
     def retrieve_by_date(self, daterange):
+        """Retrieve reservations within a date range"""
 
         try:
             start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
@@ -463,7 +402,7 @@ class ReservationCalendar:
                 WHERE datetime(Reservation.start_date) <= datetime(?) 
                     AND datetime(Reservation.end_date) >= datetime(?)
                 """
-            params = (end, start) # why is this reversed?
+            params = (end, start) 
             
             result = self.db_manager.execute_query(query, params)
             return result
@@ -471,12 +410,15 @@ class ReservationCalendar:
         except sqlite3.Error as e:
             print("Database error: ", str(e))
             raise
+
         except Exception as e:
             print(f"Error: {e}")
             raise
     
      
     def retrieve_by_machine(self, daterange, machine):
+        """Retrieve reservations for a particular machine
+           within a date range"""
         try:
             start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
             end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
@@ -503,6 +445,8 @@ class ReservationCalendar:
         
     
     def retrieve_by_customer(self, daterange, customer):
+        """Retrieve reservations for a particular cutsomer
+           within a date range"""
         try:
             start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
             end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
@@ -532,6 +476,8 @@ class ReservationCalendar:
 
     
     def retrieve_by_machine_and_customer(self, daterange, machine, customer):
+        """Retrieve reservations for a particular machine
+           and customer within a date range"""
         try:
             start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
             end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
@@ -562,64 +508,33 @@ class ReservationCalendar:
 
        
     def list_remote_reservations(self):
+        """List reservations made for 
+        other facilities"""
 
         query = "SELECT * FROM Remote_Reservation"
         result = self.db_manager.execute_query(query)
         return result
-
-
-    
-    # def retrieve_by_machine_and_customer(self, daterange, machine, customer):
-    #     final_reservations = []
-    
-    #     for reservation in self.reservations.values():
-    #         if (reservation.machine == machine and 
-    #             reservation.customer == customer and 
-    #             reservation.daterange.start_date <= daterange.end_date and 
-    #             reservation.daterange.end_date >= daterange.start_date):
-    #             final_reservations.append(reservation)
-        
-    #     return final_reservations
     
     
     def add_reservation(self, reservation, outside_reservation=False):
+        """Add a reservation if it is possible"""
         try:
             machine_id = self._get_Machine_id(reservation)
-            self._verify_business_hours(reservation)
+            # check if reservation is to be made during wokring hours
+            self._verify_business_hours(reservation) 
+
+            # check if machine is available
             self._check_equipment_availability(reservation)
+
+            # save reservation in database
             self._save_reservation(reservation, machine_id, outside_reservation)
         except ValueError as e:
             print(f"Error: {e}")
             raise
         
-    # def add_user(self, username, password_hash, salt, user_role):
-
-    #     try:
-    #         conn = self.get_db()
-    #         cursor = conn.cursor()
-    #         cursor.execute("INSERT INTO User (username, password_hash, salt, role) VALUES (?, ?, ?, ?)", 
-    #                    (username, password_hash, salt, user_role))
-    #         conn.commit()
-    #         conn.close()
-               
-    #     except sqlite3.Error as e:
-    #         print("Database error: ",str(e))
-    #         raise
-
-    # def update_user_password(self, new_hashed_password, new_salt, username):
-    #     try:
-    #         conn = self.get_db()
-    #         cursor = conn.cursor()
-    #         cursor.execute("UPDATE User SET password_hash = ?, salt = ? WHERE username = ?", 
-    #                    (new_hashed_password, new_salt, username))
-    #         conn.commit()
-    #         conn.close()
-               
-    #     except sqlite3.Error as e:
-    #         print("Database error: ",str(e))
-    #         raise
     
     def remove_reservation(self, reservation_id):
+        """Cancels a reservation"""
         try:
             # Query to get the reservation details for the given reservation_id
             query = """
@@ -663,6 +578,7 @@ class ReservationCalendar:
             print("Database error: ", str(e))
 
     def remove_remote_reservation(self, reservation_id):
+        """Cancel a reservation made for another facility"""
         try:
             # Query to get the reservation details for the given reservation_id
             query = """
@@ -705,6 +621,7 @@ class ReservationCalendar:
             print("Database error: ", str(e))
             
     def _get_Machine_id(self, reservation):
+        """Get machine ID from machine name"""
         try:
             machine_query = "SELECT machine_id FROM Machine WHERE name = ?"
             machine_id_result = self.db_manager.execute_query(machine_query, (reservation.machine,))
@@ -717,6 +634,10 @@ class ReservationCalendar:
             raise
 
     def _save_reservation(self, reservation, machine_id, outside_reservation):
+        """Saves a reservation in the database. A reservation for another 
+        facility is saved in the Remote_Reservation table and other 
+        reservations are stored in the Reservation table"""
+
         try:
             if not outside_reservation:
                 reservation_query = """
@@ -749,6 +670,9 @@ class ReservationCalendar:
             raise
 
     def _verify_business_hours(self, reservation):
+        """Verify if reservation timings fall
+        within working hours"""
+
         # Check if the reservation is on a Sunday
         if reservation.daterange.start_date.weekday() == 6:
             raise ValueError("Reservations cannot be made on Sundays.")
@@ -776,6 +700,7 @@ class ReservationCalendar:
             raise ValueError("Reservations cannot be made more than 30 days in advance.")
         
     def _check_equipment_availability(self, reservation):
+        """Check if equipment is available for a reservation"""
         
         try:
             overlapping_reservations = self.retrieve_by_date(reservation.daterange)

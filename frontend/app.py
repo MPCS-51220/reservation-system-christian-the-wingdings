@@ -97,12 +97,6 @@ menu = {
                         "validate": "date",
                         "error_message": "Invalid end date. Please try again."
                     },
-                    # {
-                    #     "prompt": "Select the machine type",
-                    #     "validate": "enum",
-                    #     "options": ["Type A", "Type B", "Type C"],
-                    #     "error_message": "Invalid machine type selected. Please try again."
-                    # },
                     {
                         "prompt": "Enter customer name",
                         "roles": ["admin", "scheduler"],
@@ -137,13 +131,6 @@ menu = {
                         "options": ["scanner", "Type B", "Type C"],
                         "error_message": "Invalid machine type selected. Please try again."
                     }
-                    # {
-                    #     "prompt": "Enter customer name",
-                    #     "roles": ["admin", "scheduler"],
-                    #     "tag": "customer_name",
-                    #     "validate": "string",
-                    #     "error_message": "Invalid name entered. Please try again."
-                    # }
                 ]
             },
             {
@@ -422,7 +409,7 @@ class APIHandler:
        
         except RequestException as e:
             print(f"Request failed: {e}")
-            return None
+            return response.json()
 
 
 def retry_input(input_def):
@@ -533,9 +520,9 @@ class CLI:
 
 
         response = self.api_handler.make_request(command, data)
-        if command["name"] == "Login" and response:
+        if command["name"] == "Login" and 'access_token' in response:
             self.api_handler.set_token(response['access_token'])
-        print("Response:", response if response else "Failed to get a valid response from the server.")
+        print("Response:", response)
 
 
 

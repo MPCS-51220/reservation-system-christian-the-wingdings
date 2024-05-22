@@ -113,6 +113,16 @@ async def get_login_form():
 @app.post("/login")
 async def login(userlog: UserLogin,
                 user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Authenticate a user and return an access token.
+
+    Args:
+        userlog (UserLogin): The user's login credentials.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: The access token, token type, and user interface.
+    """
     try:
         user = user_manager.authenticate_user(userlog.username, userlog.password)
         if not user:
@@ -145,6 +155,16 @@ async def login(userlog: UserLogin,
 @app.post("/logout")
 @validate_user
 async def logout(request: Request):
+    """
+    Log out a user.
+
+    Args:
+        request (Request): The request object.
+
+    Returns:
+        dict: A message indicating successful logout.
+    """
+
     log_operation(request.state.user, "logout", f"{request.state.user} logged out", datetime.now())
     return {"message": "Logged out successfully"}
 
@@ -158,6 +178,17 @@ add_user_permissions = {
 async def add_user(request: Request,
                    user_request: User,
                    user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Add a new user.
+
+    Args:
+        request (Request): The request object.
+        user_request (User): The user details.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful addition of the user.
+    """
 
     try:
         user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)  
@@ -179,6 +210,17 @@ configure_biz_rules_permissions = {
 async def configure_business_rules(request: Request,
                              bizRule: BusinessRule,
                              bizManager = Depends(get_business_manager)):
+    """
+    Configure/update business rules.
+
+    Args:
+        request (Request): The request object.
+        bizRule (BusinessRule): The business rule to update.
+        bizManager (BusinessManager): The business manager dependency.
+
+    Returns:
+        dict: A message indicating successful update of business rules.
+    """
 
     rule = bizRule.rule
     value = bizRule.value
@@ -254,10 +296,18 @@ async def add_reservation(request: Request,
                             calendar: ReservationCalendar = Depends(get_calendar),
                             business_manager: BusinessManager = Depends(get_business_manager)):
     """
-    This endpoints attempts to add a reservation with a particular
-    customer name, machine, start date and end date. It returns a
-    status code of 201 if the reservation was made successfully or
-    a status code of 500 if there was an error
+    Attemps to add a new reservation.
+
+    Args:
+        request (Request): The request object.
+        reservation_request (Reservation_Req): The reservation request details.
+        user_manager (UserManager): The user manager dependency.
+        calendar (ReservationCalendar): The reservation calendar dependency.
+        business_manager (BusinessManager): The business manager dependency.
+
+    Returns:
+        dict: A message indicating successful addition of the reservation, 
+        or HTTP 500 error if not suucessful
     """
     try:
 
@@ -304,6 +354,21 @@ async def get_reservations(request: Request,
                            start_date: str = Query(..., description="Start date of the reservation period"),
                            end_date: str = Query(..., description="End date of the reservation period"),
                            calendar: ReservationCalendar = Depends(get_calendar)):
+    """
+    Retrieve reservations based on customer, machine, and date range.
+
+    Args:
+        request (Request): The request object.
+        customer (str): The customer name.
+        machine (str): The machine name.
+        start_date (str): The start date of the reservation period.
+        end_date (str): The end date of the reservation period.
+        calendar (ReservationCalendar): The reservation calendar dependency.
+
+    Returns:
+        dict: The reservations that match the given criteria.
+    """
+
     try:
         if request.state.role == "customer" and customer is None:
             customer = request.state.user
@@ -359,8 +424,16 @@ async def cancel_reservation(request: Request,
                              reservation_id: str = Query(..., description="Reservation ID"),
                              calendar: ReservationCalendar = Depends(get_calendar)):
     """
-    This endpoint attempts to cancel a reservation. If no
-    such reservation is found, a status code 404 is returned.
+    Cancel a reservation.
+
+    Args:
+        request (Request): The request object.
+        reservation_id (str): The reservation ID.
+        calendar (ReservationCalendar): The reservation calendar dependency.
+
+    Returns:
+        dict: A message indicating successful cancellation of the reservation,
+        or HTTP 404 error if reservation not found
     """
     try:
         print('cancel reservation try block')
@@ -392,6 +465,17 @@ del_user_permissions = {
 async def remove_user(request: Request,
                       username: str = Query(..., description="Username of the user to delete"),
                       user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Remove a user.
+
+    Args:
+        request (Request): The request object.
+        username (str): The username of the user to delete.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful deletion of the user.
+    """
     try:
         user_manager.remove_user(username)
         log_operation(request.state.user,
@@ -416,6 +500,18 @@ patch_user_role_permissions = {
 async def update_user_role(request: Request,
                            role_request: UserRole,
                            user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Update a user's role.
+
+    Args:
+        request (Request): The request object.
+        role_request (UserRole): The role update request.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful update of the user's role.
+    """
+    
     try:
         user_manager.update_user_role(role_request.role, role_request.username)
         log_operation(request.state.user,
@@ -432,9 +528,6 @@ async def update_user_role(request: Request,
 
 
 
-
-
-
 patch_user_password_permissions = {
     "admin": None,
     "customer": is_customer_accessing_own_data
@@ -446,6 +539,17 @@ patch_user_password_permissions = {
 async def update_user_password(request: Request,
                          user_request: User,
                          user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Update a user's password.
+
+    Args:
+        request (Request): The request object.
+        user_request (UserRole): The password update request.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful update of the user's password.
+    """
     try:
         if request.state.role == "customer":
             user_request.username = request.state.user
@@ -473,6 +577,17 @@ async def update_user_password(request: Request,
 async def update_temp_password(request: Request,
                          user_request: User,
                          user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Update a user's temporary password.
+
+    Args:
+        request (Request): The request object.
+        user_request (User): The user details.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful update of the user's temporary password.
+    """
     try:
         #if request.state.role == "customer":
         #    user_request.username = request.state.user
@@ -509,6 +624,17 @@ deactivate_activate_permissions={
 async def deactivate_user(request: Request,
                           user_request: Activation,
                           user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Deactivate a user.
+
+    Args:
+        request (Request): The request object.
+        user_request (Activation): The user activation details.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful deactivation of the user.
+    """
     try:
         user_manager.deactivate_user(user_request.username)
         log_operation(request.state.user,
@@ -529,6 +655,17 @@ async def deactivate_user(request: Request,
 async def activate_user(request: Request,
                         user_request: Activation,
                         user_manager: UserManager = Depends(get_user_manager)):
+    """
+    Activate a user.
+
+    Args:
+        request (Request): The request object.
+        user_request (Activation): The user activation details.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: A message indicating successful activation of the user.
+    """
     
     try:
         user_manager.activate_user(user_request.username)
@@ -550,6 +687,16 @@ async def activate_user(request: Request,
 @role_required(deactivate_activate_permissions)
 async def list_users(request: Request,
                      user_manager: UserManager = Depends(get_user_manager)):
+    """
+    List all users with their status.
+
+    Args:
+        request (Request): The request object.
+        user_manager (UserManager): The user manager dependency.
+
+    Returns:
+        dict: The list of users with their status.
+    """
 
 
     try:
@@ -582,6 +729,19 @@ async def handle_requests(request:Request, remote_request: RemoteRequest,
                           api_key: str = Depends(api_key_auth),
                           business_manager: BusinessManager = Depends(get_business_manager)
                           ):
+    """
+    Handle outside reservation requests.
+
+    Args:
+        request (Request): The request object.
+        remote_request (RemoteRequest): The remote reservation request details.
+        calendar (ReservationCalendar): The reservation calendar dependency.
+        api_key (str): The API key for authentication.
+        business_manager (BusinessManager): The business manager dependency.
+
+    Returns:
+        dict: A message indicating whether the reservation was successful.
+    """
     try:
         # convert start_time and end_time to correct timezone
         start_time = convert_timezone(remote_request.start_time, 
@@ -621,6 +781,17 @@ del_remote_reservation_permissions = {
 async def cancel_remote_reservation(request: Request,
                              reservation_id: str = Query(..., description="Reservation ID"),
                              calendar: ReservationCalendar = Depends(get_calendar)):
+    """
+    Cancel a reservation made for another facility.
+
+    Args:
+        request (Request): The request object.
+        reservation_id (str): The reservation ID.
+        calendar (ReservationCalendar): The reservation calendar dependency.
+
+    Returns:
+        dict: A message indicating successful cancellation of the reservation.
+    """
 
    
     try:
@@ -645,7 +816,16 @@ list_remote_reservations_permissions = {
 @role_required(list_remote_reservations_permissions)
 async def list_remote(request: Request,
                      calendar: ReservationCalendar = Depends(get_calendar)):
+    """
+    List all reservations made for other facilities.
 
+    Args:
+        request (Request): The request object.
+        calendar (ReservationCalendar): The reservation calendar dependency.
+
+    Returns:
+        dict: The list of remote reservations or a message indicating no reservations found.
+    """
 
     try:
         reservations = calendar.list_remote_reservations()
