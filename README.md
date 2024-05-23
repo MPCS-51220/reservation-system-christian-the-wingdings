@@ -1,10 +1,7 @@
-# T-03: Station 13 Facility Management
+# T-04: Interoperate!
 
 ## Overview
-This assignment allows your team to select some of the feature your team will implement from a backlog.
-Basic requirements must be implemented/completed.
-Backlog requirements are each worth specific number of points. 
-The difficulty of the backlog requirements varies. The number of points assigned to each is loose guide of expected difficulty for a typical team, but may not be a perfect indicator for your team, so think through them and decide. The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663328
+MPCS, Inc. has decided that they are losing business by having each facility manage its own reservations. They'd like to consolidate their systems.  As a first step, they want all teams to implement a feature that lets any facility reserve a resource at another facility.   The full assignment can be found here: https://canvas.uchicago.edu/courses/56612/assignments/663325?module_item_id=2406263
 
 
 # Equipment Reservation System Documentation
@@ -249,16 +246,13 @@ one-to-many connection from User to Operations
 
 ## T-03 Feature Points
 
-<<<<<<< HEAD
-
 ### Login Feature through token (15 points)
 
 Upon starting the application, the user will be provided first with a login prompt where they enter credentials. If they provide a proper username and password combination, they are logged in as a user and given functionality depending on their role in the system. This is instantiated through a jwt token which is automatically passed in the header of every api-call from the user and permissions are instantiated based on the user's 'role' which is encoded in the system. Each route other than log in checks for valid login through the '@validate_user' wrapper and makes sure that the authenticated user is inline with the permissions associated with the route through the @role_required wrapper'. 
 
 Permissions are constructed through a dictionary to the '@role_required' wrapper with the key:value mapping being associated to the 'user_role': 'function with logic for additional constraints or None'. If a user_role is not allowed to access the route, then it is left out of the permissions dictionary.
 
-=======
->>>>>>> 955ba7b1416a5a07411eacb43fe77820dbe4fcc8
+
 ### Configurable Business Rules (5 points)
 
 We added an admin command on the frontend that allows the user to set particular values related to Reservations and logistics. Once the frontend rule and value are specified, an API request is made to the backend to change those values in the code. Then, the admin can set the following values in the code:
@@ -282,6 +276,19 @@ Once these changes go through, these changes are generally updated for the entir
 
 An admin can execute a command from the frontend that either deactivates a user, activates a user or lists all users with their activation state. An API endpoint has been specified to perform each of these tasks. The user's activation state is stored and modified in the database. A deactivated user cannot make a reservation or have a reservation made on their behalf.
 
+## T-04 Feature Points
+
+### Web Interface (15 points)
+
+There is now a web interface containing core requirements of the reservation system.
+
+## T-04 Additional Features
+
+There is now an interoperability section designed to take in outside requests. It uses a shared endpoint in our backend between all the teams. It also has a separate client.
+
+The configurable business rules were refactored in order to be more robust in the code.
+
+We added additional tests and error handling for all features we have accumulated.
 
 
 ## Contributing
