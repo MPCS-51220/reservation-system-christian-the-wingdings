@@ -58,10 +58,8 @@ class UserManager:
 
     def authenticate_user(self, username: str, password: str):
         """Authenticate a user using username and password."""
-        print(f'auth_user just started: {username}, {password}')
 
         user = self.get_user(username)
-        print(f'user in authenticate_user: {user}')
         if user and self.verify_password(password, user['password_hash'], user['salt']):
             return user
         return False

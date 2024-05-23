@@ -117,13 +117,10 @@ async def login(userlog: UserLogin,
     """
     try:
         user = user_manager.authenticate_user(userlog.username, userlog.password)
-        print(f'user: {user}')
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
-        print(f'userlog.password: {userlog.password}')
         if user and userlog.password.startswith('_temp'):
             user['role'] = '_temp'
-        print(f'user role: {user["role"]}')
         access_token = create_access_token(data={"sub": user['username'],
                                                     "role": user['role']
                                                     })
@@ -186,7 +183,6 @@ async def add_user(request: Request,
     try:
         salt = 'salty'
         pwd = '_temp'+user_request.password
-        print(f'pwd: {pwd}')
         user_manager.add_user(user_request.username, pwd, user_request.role, salt)  
         log_operation(request.state.user, "add user", f"{user_request.username} user added", datetime.now())
         return {"message": f'{user_request.username} added successfully'}
@@ -568,18 +564,8 @@ async def update_user_password(request: Request,
         if request.state.role == "admin" and user_request.username is not request.state.user:
             pwd = '_temp'+pwd
         
-            
-        # if request.state.role == "customer":
-        #     user_request.username = request.state.user
-
-        # if user_request.salt == None and user_request.password == None:
-        #     user_request.salt = "random_salt"
-        #     user_request.password = "temp"
-        # elif user_request.salt == None:
-        #     user_request.salt = os.urandom(32).hex()
         user_manager.update_password(user_request.username, pwd, salt)
 
-        # user_manager.update_password(user_request.username, user_request.password, user_request.salt)
         log_operation(request.state.user,
                       "change user password", 
                       f"Password changed for {user_request.username}", 
