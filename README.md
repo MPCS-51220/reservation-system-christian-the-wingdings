@@ -20,6 +20,8 @@ Welcome to the Equipment Reservation System! This system is designed to help use
 - [New Features](#new-features)
 - [Database System](#database-system)
 - [T-03 Feature Points](#t-03-feature-points)
+- [T-04 Feature Points](#t-04-feature-points)
+- [T-04 Additional Features](#t-04-additional-features)
 - [Contributing](#contributing)
 
 
