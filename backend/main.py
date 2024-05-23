@@ -70,14 +70,6 @@ def log_operation(username, type, description, timestamp):
     """
     try:
         timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        # print(f'25, username: {username}, type: {type}, description: {description}, timestamp: {timestamp}')
-        # print(f'27, db: {db_manager}')
-        # id_query = f"SELECT user_id FROM USER WHERE username = ?"
-        # id = db_manager.execute_query(id_query, (username,))
-        # insert_query = """INSERT INTO Operation (user_id, type, description, timestamp)
-        #                 VALUES (?, ?, ?, ?)"""
-        # print(f'32, id: {id}, id[0]: {id[0]} insert_query: {insert_query}')
-        # db_manager.execute_query(insert_query, (id[0], type, description, timestamp))
         
         with sqlite3.connect('../reservationDB.db') as conn:
             cursor = conn.cursor()
@@ -133,7 +125,6 @@ async def login(userlog: UserLogin,
         access_token = create_access_token(data={"sub": user['username'],
                                                     "role": user['role']
                                                     })
-        print(f"user: {user['username']}, role: {user['role']} logged in")
         log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
         
         menu = WebBuilder(user['role'])
@@ -336,7 +327,7 @@ async def add_reservation(request: Request,
                             detail=f'Failed to add reservation due to {e}')
 
 def is_customer_accessing_own_data(user_username, **kwargs):
-    customer_name = kwargs.get('customer')
+    customer_name = kwargs.get('customer', user_username)
     return user_username == customer_name or customer_name is None
 
 get_reservations_prmissions = {
@@ -410,10 +401,14 @@ async def get_reservations(request: Request,
 
 
 
+def is_customer_deleting_their_data(user_username, **kwargs):
+    customer_name = kwargs.get('customer')
+    return user_username == customer_name
+
 del_reservation_permissions = {
     "admin": None,
     "scheduler": None,
-    "customer": is_customer_accessing_own_data
+    "customer": is_customer_deleting_their_data
 }
 
 
@@ -450,7 +445,6 @@ async def cancel_reservation(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
-
 
 
 

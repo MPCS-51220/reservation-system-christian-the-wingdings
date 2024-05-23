@@ -17,7 +17,7 @@ class UserManager:
         
     '''
 
-    def __init__(self, DatabaseManager, db_connection=None):
+    def __init__(self, DatabaseManager):
         self.db_manager = DatabaseManager
         
 
@@ -183,7 +183,6 @@ class DatabaseManager:
             self.connection = connection
             self.db_path = db_path if connection is None else None
             self.initialized = True
-            # print(f"Database Manager initialized at path: {self.db_path}")
 
     @contextmanager
     def get_connection(self):

@@ -1,6 +1,11 @@
 from fastapi.testclient import TestClient
+from fastapi import Request, HTTPException, status
+import time
+from permissions import role_required, validate_user, validate_user_token, check_role_permissions, RoleNotFoundError, PermissionDeniedError
+from token_manager import create_access_token, decode_access_token, SECRET_KEY, ALGORITHM, ExpiredTokenError, InvalidTokenError, TokenCreationError
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from jose import jwt, ExpiredSignatureError, JWTError
 from modules import DateRange, Reservation, ReservationCalendar, UserManager, DatabaseManager, BusinessManager
 import pytest
 from main import app
@@ -260,6 +265,165 @@ def test_get_rule_fale(setup_db, biz_manager):
 
 
 ############ Permissions AUTH Tests ############
+def test_create_access_token():
+    data = {"sub": "testuser", "role": "customer"}
+    token = create_access_token(data)
+    
+    decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    exp_timestamp = decoded_token["exp"]
+    exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+    
+    assert decoded_token["sub"] == "testuser"
+    assert decoded_token["role"] == "customer"
+    assert "exp" in decoded_token
+    assert exp_datetime <= datetime.now(timezone.utc) + timedelta(minutes=15)
+    assert exp_datetime > datetime.now(timezone.utc) + timedelta(minutes=14)
+
+def test_create_access_token_with_expiration():
+    data = {"sub": "testuser", "role": "customer"}
+    expires_delta = timedelta(minutes=5)
+    token = create_access_token(data, expires_delta)
+    
+    decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    exp_timestamp = decoded_token["exp"]
+    exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+    
+    assert exp_datetime <= datetime.now(timezone.utc) + timedelta(minutes=5)
+    assert exp_datetime > datetime.now(timezone.utc) + timedelta(minutes=4)
+    assert decoded_token["sub"] == "testuser"
+    assert decoded_token["role"] == "customer"
+    assert "exp" in decoded_token
+
+def test_create_access_token_error():
+    with pytest.raises(TokenCreationError):
+        create_access_token(None)
+
+def test_decode_access_token():
+    data = {"sub": "testuser", "role": "customer"}
+    token = create_access_token(data)
+    
+    decoded_token = decode_access_token(token)
+    
+    assert decoded_token["sub"] == "testuser"
+    assert decoded_token["role"] == "customer"
+
+def test_decode_access_token_expired():
+    data = {"sub": "testuser", "role": "customer"}
+    token = create_access_token(data, timedelta(seconds=1))
+    
+    # Wait for the token to expire
+    import time
+    time.sleep(2)
+    
+    with pytest.raises(ExpiredTokenError) as excinfo:
+        decode_access_token(token)
+    
+    assert "Token has expired" in str(excinfo.value)
+
+def test_decode_access_token_invalid():
+    invalid_token = "invalid_token"
+    
+    with pytest.raises(InvalidTokenError) as excinfo:
+        decode_access_token(invalid_token)
+    
+    assert "Invalid token" in str(excinfo.value)
+    
+def test_validate_user_token_valid():
+    user_data = {"sub": "testuser", "role": "customer"}
+    token = create_access_token(user_data)
+    auth_header = f"Bearer {token}"
+    user, role = validate_user_token(auth_header)
+    assert user == "testuser"
+    assert role == "customer"
+
+def test_validate_user_token_invalid():
+    invalid_token = "invalid_token"
+    auth_header = f"Bearer {invalid_token}"
+    with pytest.raises(HTTPException) as excinfo:
+        validate_user_token(auth_header)
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "Invalid token"
+
+def test_validate_user_token_expired():
+    user_data = {"sub": "testuser", "role": "customer"}
+    token = create_access_token(user_data, timedelta(seconds=1))
+    auth_header = f"Bearer {token}"
+    
+    # Wait for the token to expire
+    import time
+    time.sleep(2)
+    
+    with pytest.raises(HTTPException) as excinfo:
+        validate_user_token(auth_header)
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "Token has expired"
+
+def test_validate_user_token_no_user_or_role():
+    payload = {"sub": 'testuser'}
+    token = create_access_token(payload)
+    auth_header = f"Bearer {token}"
+    with pytest.raises(HTTPException) as excinfo:
+        validate_user_token(auth_header)
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail == "Invalid token: no user or role"
+
+
+def is_customer_accessing_own_data(user_username, **kwargs):
+    customer_name = kwargs.get('customer')
+    return user_username == customer_name
+
+def test_check_role_permissions_valid():
+    roles_permissions = {
+        "admin": None,
+        "scheduler": None,
+        "customer": is_customer_accessing_own_data
+    }
+    
+    # Test valid admin role
+    assert check_role_permissions("admin", roles_permissions, "testuser")
+    
+    # Test valid scheduler role
+    assert check_role_permissions("scheduler", roles_permissions, "testuser")
+    
+    # Test valid customer role accessing own data
+    kwargs = {'customer': 'testuser'}
+    assert check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
+    
+    # Test valid customer role when customer name is None
+    kwargs = {'customer': None}
+    assert check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
+    
+    # Test invalid role
+    with pytest.raises(RoleNotFoundError) as excinfo:
+        check_role_permissions("nonexistent_role", roles_permissions, "testuser")
+    assert str(excinfo.value) == "Role 'nonexistent_role' not found in permissions."
+    
+    # Test invalid customer role accessing other user's data
+    kwargs = {'customer': 'otheruser'}
+    with pytest.raises(PermissionDeniedError) as excinfo:
+        check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
+    assert str(excinfo.value) == "Permission denied for user 'testuser' with role 'customer'."
+
+# def is_customer(user, **kwargs):
+#     return user == "customer"
+
+# roles_permissions = {
+#     "admin": None,
+#     "customer": is_customer,
+# }
+
+# @role_required(roles_permissions)
+# async def sample_role_endpoint(request: Request):
+#     return {"message": "success"}
+
+# def test_role_required_decorator_valid_role(client):
+#     user_data = {"sub": "customer", "role": "customer"}
+#     token = create_access_token(user_data)
+
+#     request = client.build_request("GET", "/", headers={"Authorization": f"Bearer {token}"})
+#     response = client.request("GET", "/", headers={"Authorization": f"Bearer {token}"})
+#     assert response.status_code == 200
+#     assert response.json() == {"message": "success"}
 
 
 ######
