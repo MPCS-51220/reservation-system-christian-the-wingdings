@@ -254,29 +254,29 @@ add_reservation_permissions = {
 }
 
 
-# def attempt_remote_reservation(reservation):
-#     try:
-#         data={
-#             "start_time":reservation.daterange.start_date,
-#             "end_time":reservation.daterange.end_date,
-#             "client_name":reservation.customer,
-#             "machine_name":reservation.machine,
-#             "time_zone":"GMT-5",
-#             "blocks":"Null"
-#         }
+def attempt_remote_reservation(reservation):
+    try:
+        data={
+            "start_time":f'{reservation.daterange.start_date}',
+            "end_time":f'{reservation.daterange.end_date}',
+            "client_name":f'{reservation.customer}',
+            "machine_name":f'{reservation.machine}',
+            "time_zone":"GMT-5",
+            "blocks":"Null"
+        }
 
-#         remote_endpoints = [] # store urls for the 3 teams' endpoints here
-#         headers={"API-Key":API_KEY}
-#         for url in remote_endpoints:
-#             response = requests.post(url, headers=headers,json=data)
-#             if response.json()['reservation_made_success']:
-#                 return {"message": "Reservation added successfully at a remote facility!"}
+        remote_endpoints = [] # store urls for the 3 teams' endpoints here
+        headers={"API-Key":API_KEY}
+        for url in remote_endpoints:
+            response = requests.post(url, headers=headers,json=data)
+            if response.json()['reservation_made_success']:
+                return {"message": "Reservation added successfully at a remote facility!"}
     
-#         return {"message":"Reservation was not made due to unavailable resources"}
+        return {"message":"Reservation was not made due to unavailable resources"}
     
-#     except Exception as e:
-#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                              detail=f'Failed to add reservation due to {e}')
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                             detail=f'Failed to add reservation due to {e}')
 
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
