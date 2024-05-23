@@ -18,7 +18,7 @@ class User(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     role: Optional[str] = None
-    salt: Optional[str] = None
+    salt: Optional[str] = ''
 
 class Reservation_Req(BaseModel):
     id: Optional[int] = None

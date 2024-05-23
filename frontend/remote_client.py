@@ -21,7 +21,7 @@ def main():
             }
         
         headers={"API-Key":API_KEY}
-        response = requests.post('http://localhost:8000/outside-requests',json=data, headers=headers)
+        response = requests.post('http://linux1:51221/outside-requests',json=data, headers=headers)
         message = response.json()
 
         if message.get("reservation_made_success"): # reservation made

@@ -506,10 +506,42 @@ class ReservationCalendar:
     def list_remote_reservations(self):
         """List reservations made for 
         other facilities"""
+        try:
+            query = "SELECT * FROM Remote_Reservation"
+            result = self.db_manager.execute_query(query)
+            return result
+        
+        except sqlite3.Error as e:
+            print("Database error: ",e)
+            raise
 
-        query = "SELECT * FROM Remote_Reservation"
-        result = self.db_manager.execute_query(query)
-        return result
+        except Exception as e:
+            print(f"Error: {e}")
+            raise
+    
+    def retrieve_remote_reservations_date(self, daterange):
+        try:
+            start = daterange.start_date.strftime('%Y-%m-%d %H:%M')
+            end = daterange.end_date.strftime('%Y-%m-%d %H:%M')
+            
+            query = """
+                SELECT * FROM Remote_Reservation
+                WHERE datetime(start_date) <= datetime(?) 
+                AND datetime(end_date) >= datetime(?)
+                """
+            params = (end, start) 
+            
+            result = self.db_manager.execute_query(query, params)
+            return result
+
+        except sqlite3.Error as e:
+            print("Database error: ", str(e))
+            raise
+
+        except Exception as e:
+            print(f"Error: {e}")
+            raise
+
     
     
     def add_reservation(self, reservation, outside_reservation=False):
@@ -697,9 +729,11 @@ class ReservationCalendar:
         
     def _check_equipment_availability(self, reservation):
         """Check if equipment is available for a reservation"""
-        
         try:
             overlapping_reservations = self.retrieve_by_date(reservation.daterange)
+            overlapping_reservations.extend(
+                self.retrieve_remote_reservations_date(reservation.daterange)
+                ) # include remote reservations too
             # Count how many scanners, harvesters, and scoopers are reserved in the overlapping period
             scanner_count = 0
             harvester_reserved = False
@@ -713,6 +747,7 @@ class ReservationCalendar:
                 if res['machine_name'] == "scooper":
                     scooper_count += 1
 
+
             # Check constraints for scanners
             if reservation.machine == "scanner":
                 if scanner_count >= self.biz_manager.number_of_scanners: #3
@@ -720,15 +755,15 @@ class ReservationCalendar:
                 if harvester_reserved:
                     raise ValueError("Scanners cannot operate while the harvester is in use.")
 
-                # Check if the reservation is for a harvester and if any scanner is reserved
-                if reservation.machine == "harvester":
-                    if scanner_count > 0:
-                        raise ValueError("The harvester cannot operate while scanners are in use.")
-                    if harvester_reserved:
-                        raise ValueError("The harvester is already reserved for this time period.")
+            # Check if the reservation is for a harvester and if any scanner is reserved
+            elif reservation.machine == "harvester":
+                if scanner_count > 0:
+                    raise ValueError("The harvester cannot operate while scanners are in use.")
+                if harvester_reserved:
+                    raise ValueError("The harvester is already reserved for this time period.")
 
             # Check constraints for scoopers
-            if reservation.machine == "scooper":
+            elif reservation.machine == "scooper":
                 if scooper_count >= self.biz_manager.number_of_scoopers:  #3 # Since there are 4 scoopers, we can reserve up to 3 at the same time
                     raise ValueError("Only one scooper must remain available; maximum number already reserved.")
 

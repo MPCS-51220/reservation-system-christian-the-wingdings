@@ -70,7 +70,7 @@ def log_operation(username, type, description, timestamp):
     """
     try:
         timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        
+       
         with sqlite3.connect('../reservationDB.db') as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT user_id FROM USER WHERE username = ?",(username,))
@@ -119,11 +119,13 @@ async def login(userlog: UserLogin,
         user = user_manager.authenticate_user(userlog.username, userlog.password)
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
-        if user and userlog.password.startswith('_temp'):
-            user['role'] = '_temp'
+        if user and userlog.password == 'temp':
+            print("Cannot use temp password. Use 'Change temporary password' to fix this.")
+            raise HTTPException(status_code=401, detail="Cannot use temp password. Use 'Change temporary password' to fix this.")
         access_token = create_access_token(data={"sub": user['username'],
                                                     "role": user['role']
                                                     })
+        print(f"user: {user['username']}, role: {user['role']} logged in")
         log_operation(user['username'],"login", f"{user['username']} logged in", datetime.now())
         
         menu = WebBuilder(user['role'])
@@ -181,9 +183,7 @@ async def add_user(request: Request,
     """
 
     try:
-        salt = 'salty'
-        pwd = '_temp'+user_request.password
-        user_manager.add_user(user_request.username, pwd, user_request.role, salt)  
+        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)  
         log_operation(request.state.user, "add user", f"{user_request.username} user added", datetime.now())
         return {"message": f'{user_request.username} added successfully'}
     except Exception as e:
@@ -254,29 +254,35 @@ add_reservation_permissions = {
 }
 
 
-# def attempt_remote_reservation(reservation):
-#     try:
-#         data={
-#             "start_time":reservation.daterange.start_date,
-#             "end_time":reservation.daterange.end_date,
-#             "client_name":reservation.customer,
-#             "machine_name":reservation.machine,
-#             "time_zone":"GMT-5",
-#             "blocks":"Null"
-#         }
+def attempt_remote_reservation(reservation):
+    try:
+        data={
+            "Start Time":reservation.daterange.start_date.strftime('%Y-%m-%d %H:%M'),
+            "End Time":reservation.daterange.end_date.strftime('%Y-%m-%d %H:%M'),
+            "Client Name":reservation.customer,
+            "Machine Name":reservation.machine,
+            "Time Zone":"GMT-5",
+            "Blocks":"Null"
+        }
+        print(data)
 
-#         remote_endpoints = [] # store urls for the 3 teams' endpoints here
-#         headers={"API-Key":API_KEY}
-#         for url in remote_endpoints:
-#             response = requests.post(url, headers=headers,json=data)
-#             if response.json()['reservation_made_success']:
-#                 return {"message": "Reservation added successfully at a remote facility!"}
+        remote_endpoints = ["http://linux3:51223/outside-requests","http://linux1:51224/outside-requests"] # store urls for the 3 teams' endpoints here
+        headers={"API-Key":API_KEY}
+        for url in remote_endpoints:
+            try:
+                print("Trying to make reservation at ", url)
+                response = requests.post(url, headers=headers,json=data)
+                print("Response from remote endpoint:",response)
+                if response.json()['reservation_made_success']:
+                    return {"message": "Reservation added successfully at a remote facility!"}
+            except Exception as e:
+                print(e)
     
-#         return {"message":"Reservation was not made due to unavailable resources"}
+        return {"message":"Reservation was not made due to unavailable resources"}
     
-#     except Exception as e:
-#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                              detail=f'Failed to add reservation due to {e}')
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                             detail=f'Failed to add reservation due to {e}')
 
 
 @app.post("/reservations", status_code=status.HTTP_201_CREATED)
@@ -321,14 +327,18 @@ async def add_reservation(request: Request,
                       f"reservation added for machine {reservation_request.machine}", 
                       datetime.now())
         return {"message": "Reservation added successfully!"}
+    
+    except ValueError as e:
+        print("attempting to reserve at another facility")
+        return attempt_remote_reservation(reservation) # change this to catch specific error of no availability
    
     except Exception as e:
-        # attempt_remote_reservation(reservation) # change this to catch specific error of no availability
+        
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'Failed to add reservation due to {e}')
 
 def is_customer_accessing_own_data(user_username, **kwargs):
-    customer_name = kwargs.get('customer', user_username)
+    customer_name = kwargs.get('customer')
     return user_username == customer_name or customer_name is None
 
 get_reservations_prmissions = {
@@ -402,14 +412,10 @@ async def get_reservations(request: Request,
 
 
 
-def is_customer_deleting_their_data(user_username, **kwargs):
-    customer_name = kwargs.get('customer')
-    return user_username == customer_name
-
 del_reservation_permissions = {
     "admin": None,
     "scheduler": None,
-    "customer": is_customer_deleting_their_data
+    "customer": is_customer_accessing_own_data
 }
 
 
@@ -432,7 +438,9 @@ async def cancel_reservation(request: Request,
         or HTTP 404 error if reservation not found
     """
     try:
+        print('cancel reservation try block')
         refund = calendar.remove_reservation(reservation_id)
+        print(f'refund: {refund} in cancel_reservation')
         if refund is not False: # reservation was removed and refund amount returned
             log_operation(request.state.user,
                       "cancel reservation", 
@@ -444,6 +452,7 @@ async def cancel_reservation(request: Request,
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f'Failed to cancel reservation due to {e}')
+
 
 
 
@@ -519,19 +528,11 @@ async def update_user_role(request: Request,
 
 
 
-# def is_scheduler_accessing_own_data(user_username, **kwargs):
-#     customer_name = kwargs.get('customer')
-#     return user_username == customer_name
 
-# def is_customer_with_temp_password_accessing_own_data(user_username, **kwargs):
-#     customer_name = kwargs.get('customer')
-#     return user_username == customer_name
 
 patch_user_password_permissions = {
     "admin": None,
-    "scheduler": None,
-    "customer": None,
-    "_temp": None
+    "customer": is_customer_accessing_own_data
 }
 
 @app.patch("/users/password", status_code=status.HTTP_200_OK)
@@ -541,14 +542,10 @@ async def update_user_password(request: Request,
                          user_request: User,
                          user_manager: UserManager = Depends(get_user_manager)):
     """
-    Update a user's password. If the user is an admin, they can update any user's password.
-    The '_temp' will be appended to the password before updating it. Then, in the login function,
-    if the password begins with '_temp', the user role will be set to temp-pwd and the only function
-    they will be served in this role is the patch password route. This is to ensure that the user
-    changes their password before they can access other functions.
+    Update a user's password.
 
     Args:
-        request (Request): The request object. 
+        request (Request): The request object.
         user_request (UserRole): The password update request.
         user_manager (UserManager): The user manager dependency.
 
@@ -556,16 +553,16 @@ async def update_user_password(request: Request,
         dict: A message indicating successful update of the user's password.
     """
     try:
-        pwd = user_request.password
-        salt = os.urandom(32).hex()
-        if request.state.role != "admin":
+        if request.state.role == "customer":
             user_request.username = request.state.user
-        
-        if request.state.role == "admin" and user_request.username is not request.state.user:
-            pwd = '_temp'+pwd
-        
-        user_manager.update_password(user_request.username, pwd, salt)
 
+        if user_request.salt == None and user_request.password == None:
+            user_request.salt = "random_salt"
+            user_request.password = "temp"
+        elif user_request.salt == None:
+            user_request.salt = os.urandom(32).hex()
+
+        user_manager.update_password(user_request.username, user_request.password, user_request.salt)
         log_operation(request.state.user,
                       "change user password", 
                       f"Password changed for {user_request.username}", 
