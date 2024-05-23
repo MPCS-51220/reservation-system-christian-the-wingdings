@@ -242,6 +242,73 @@ def test_remove_reservation_fail(setup_db, transaction, calendar):
     assert result is not None
     assert result == False
 
+def test_get_Machine_id(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    result = calendar._get_Machine_id(reservation)
+    assert result is not None
+    assert isinstance(result, int)
+
+def test_verify_business_hours(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    calendar._verify_business_hours(reservation)
+
+def test_verify_business_hours_fail(setup_db, transaction, calendar, biz_manager):
+    with pytest.raises(ValueError):
+        daterange = DateRange("2024-05-26 11:00","2025-05-26 12:00")
+        reservation = Reservation("christian", "harvester", daterange, biz_manager)
+        calendar._verify_business_hours(reservation)
+
+def test_check_equipment_availability(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    calendar._check_equipment_availability(reservation)
+
+def test_calculate_cost(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    cost = reservation.calculate_cost()
+    assert cost is not None
+    assert isinstance(cost, int)
+
+def test_calculate_discount(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    cost = reservation.calculate_discount()
+    assert cost > 0
+    assert isinstance(cost, float)
+
+def test_calculate_discount_fail(setup_db, transaction, calendar, biz_manager):
+    with pytest.raises(AssertionError):
+        daterange = DateRange("2024-05-20 11:00","2025-05-20 12:00")
+        reservation = Reservation("christian", "harvester", daterange, biz_manager)
+        cost = reservation.calculate_discount()
+        assert cost > 0
+        assert isinstance(cost, float)
+
+def test_calculate_down_payment(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    cost = reservation.calculate_down_payment()
+    assert cost is not None
+    assert isinstance(cost, float)
+
+def test_calculate_refund(setup_db, transaction, calendar, biz_manager):
+    daterange = DateRange("2024-06-20 11:00","2025-06-20 12:00")
+    reservation = Reservation("christian", "harvester", daterange, biz_manager)
+    cost = reservation.calculate_refund()
+    assert cost > 0
+    assert isinstance(cost, float)
+
+def test_calculate_refund_fail(setup_db, transaction, calendar, biz_manager):
+    with pytest.raises(AssertionError):
+        daterange = DateRange("2024-05-20 11:00","2025-05-20 12:00")
+        reservation = Reservation("christian", "harvester", daterange, biz_manager)
+        cost = reservation.calculate_refund()
+        assert cost > 0
+        assert isinstance(cost, float)
+
 def test_get_rule(setup_db, biz_manager):
     value = biz_manager.get_rule("week_refund")
     assert value is not None
