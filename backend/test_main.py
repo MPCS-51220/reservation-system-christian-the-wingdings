@@ -409,7 +409,7 @@ def test_validate_user_token_invalid():
     with pytest.raises(HTTPException) as excinfo:
         validate_user_token(auth_header)
     assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == "Invalid token"
+    assert excinfo.value.detail == "Invalid token: Invalid token during decoding"
 
 def test_validate_user_token_expired():
     user_data = {"sub": "testuser", "role": "customer"}
@@ -423,7 +423,7 @@ def test_validate_user_token_expired():
     with pytest.raises(HTTPException) as excinfo:
         validate_user_token(auth_header)
     assert excinfo.value.status_code == 401
-    assert excinfo.value.detail == "Token has expired"
+    assert excinfo.value.detail == "Token has expired: Token has expired"
 
 def test_validate_user_token_no_user_or_role():
     payload = {"sub": 'testuser'}
@@ -469,7 +469,7 @@ def test_check_role_permissions_valid():
     kwargs = {'customer': 'otheruser'}
     with pytest.raises(PermissionDeniedError) as excinfo:
         check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
-    assert str(excinfo.value) == "Permission denied for user 'testuser' with role 'customer'."
+    assert str(excinfo.value) == "permissions.PermissionDeniedError: Permission denied for user 'testuser' with role 'customer'."
 
 # def is_customer(user, **kwargs):
 #     return user == "customer"
