@@ -257,20 +257,26 @@ add_reservation_permissions = {
 def attempt_remote_reservation(reservation):
     try:
         data={
-            "start_time":reservation.daterange.start_date,
-            "end_time":reservation.daterange.end_date,
-            "client_name":reservation.customer,
-            "machine_name":reservation.machine,
-            "time_zone":"GMT-5",
-            "blocks":"Null"
+            "Start Time":reservation.daterange.start_date.strftime('%Y-%m-%d %H:%M'),
+            "End Time":reservation.daterange.end_date.strftime('%Y-%m-%d %H:%M'),
+            "Client Name":reservation.customer,
+            "Machine Name":reservation.machine,
+            "Time Zone":"GMT-5",
+            "Blocks":"Null"
         }
+        print(data)
 
-        remote_endpoints = ["http://localhost:51222","http://localhost:51223","http://localhost:51224"] # store urls for the 3 teams' endpoints here
+        remote_endpoints = ["http://linux3:51223/outside-requests","http://linux1:51224/outside-requests"] # store urls for the 3 teams' endpoints here
         headers={"API-Key":API_KEY}
         for url in remote_endpoints:
-            response = requests.post(url, headers=headers,json=data)
-            if response.json()['reservation_made_success']:
-                return {"message": "Reservation added successfully at a remote facility!"}
+            try:
+                print("Trying to make reservation at ", url)
+                response = requests.post(url, headers=headers,json=data)
+                print("Response from remote endpoint:",response)
+                if response.json()['reservation_made_success']:
+                    return {"message": "Reservation added successfully at a remote facility!"}
+            except Exception as e:
+                print(e)
     
         return {"message":"Reservation was not made due to unavailable resources"}
     
@@ -323,7 +329,8 @@ async def add_reservation(request: Request,
         return {"message": "Reservation added successfully!"}
     
     except ValueError as e:
-        attempt_remote_reservation(reservation) # change this to catch specific error of no availability
+        print("attempting to reserve at another facility")
+        return attempt_remote_reservation(reservation) # change this to catch specific error of no availability
    
     except Exception as e:
         

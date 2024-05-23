@@ -757,11 +757,9 @@ class ReservationCalendar:
 
             # Check if the reservation is for a harvester and if any scanner is reserved
             elif reservation.machine == "harvester":
-                print("here")
                 if scanner_count > 0:
                     raise ValueError("The harvester cannot operate while scanners are in use.")
                 if harvester_reserved:
-                    print("before error")
                     raise ValueError("The harvester is already reserved for this time period.")
 
             # Check constraints for scoopers
