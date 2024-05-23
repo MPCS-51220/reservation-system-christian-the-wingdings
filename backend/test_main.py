@@ -314,7 +314,7 @@ def test_get_rule(setup_db, biz_manager):
     assert value is not None
     assert isinstance(value, float)
 
-def test_get_rule_fale(setup_db, biz_manager):
+def test_get_rule_fail(setup_db, biz_manager):
     with pytest.raises(AssertionError):
         value = biz_manager.get_rule("harvester_price")
         assert value is not None
