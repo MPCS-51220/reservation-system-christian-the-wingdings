@@ -53,16 +53,15 @@ class UserManager:
 
     def verify_password(self, plain_password, password_hash, salt):
         """Verify a plaintext password against the hashed version."""
-
-        if password_hash == self.hash_password(plain_password, salt):
-            return True
-        else:
-            return False
+        computed_hash = self.hash_password(plain_password, salt)
+        return password_hash == computed_hash
 
     def authenticate_user(self, username: str, password: str):
         """Authenticate a user using username and password."""
+        print(f'auth_user just started: {username}, {password}')
 
         user = self.get_user(username)
+        print(f'user in authenticate_user: {user}')
         if user and self.verify_password(password, user['password_hash'], user['salt']):
             return user
         return False

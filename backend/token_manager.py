@@ -45,4 +45,4 @@ def decode_access_token(token: str):
     except ExpiredSignatureError:
         raise ExpiredTokenError("Token has expired")
     except JWTError:
-        raise InvalidTokenError("Invalid token")
+        raise InvalidTokenError("Invalid token during decoding")

@@ -117,11 +117,13 @@ async def login(userlog: UserLogin,
     """
     try:
         user = user_manager.authenticate_user(userlog.username, userlog.password)
+        print(f'user: {user}')
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
-        if user and userlog.password == 'temp':
-            print("Cannot use temp password. Use 'Change temporary password' to fix this.")
-            raise HTTPException(status_code=401, detail="Cannot use temp password. Use 'Change temporary password' to fix this.")
+        print(f'userlog.password: {userlog.password}')
+        if user and userlog.password.startswith('_temp'):
+            user['role'] = '_temp'
+        print(f'user role: {user["role"]}')
         access_token = create_access_token(data={"sub": user['username'],
                                                     "role": user['role']
                                                     })
@@ -182,7 +184,10 @@ async def add_user(request: Request,
     """
 
     try:
-        user_manager.add_user(user_request.username, user_request.password, user_request.role, user_request.salt)  
+        salt = 'salty'
+        pwd = '_temp'+user_request.password
+        print(f'pwd: {pwd}')
+        user_manager.add_user(user_request.username, pwd, user_request.role, salt)  
         log_operation(request.state.user, "add user", f"{user_request.username} user added", datetime.now())
         return {"message": f'{user_request.username} added successfully'}
     except Exception as e:
@@ -431,9 +436,7 @@ async def cancel_reservation(request: Request,
         or HTTP 404 error if reservation not found
     """
     try:
-        print('cancel reservation try block')
         refund = calendar.remove_reservation(reservation_id)
-        print(f'refund: {refund} in cancel_reservation')
         if refund is not False: # reservation was removed and refund amount returned
             log_operation(request.state.user,
                       "cancel reservation", 
@@ -520,11 +523,19 @@ async def update_user_role(request: Request,
 
 
 
+# def is_scheduler_accessing_own_data(user_username, **kwargs):
+#     customer_name = kwargs.get('customer')
+#     return user_username == customer_name
 
+# def is_customer_with_temp_password_accessing_own_data(user_username, **kwargs):
+#     customer_name = kwargs.get('customer')
+#     return user_username == customer_name
 
 patch_user_password_permissions = {
     "admin": None,
-    "customer": is_customer_accessing_own_data
+    "scheduler": None,
+    "customer": None,
+    "_temp": None
 }
 
 @app.patch("/users/password", status_code=status.HTTP_200_OK)
@@ -534,10 +545,14 @@ async def update_user_password(request: Request,
                          user_request: User,
                          user_manager: UserManager = Depends(get_user_manager)):
     """
-    Update a user's password.
+    Update a user's password. If the user is an admin, they can update any user's password.
+    The '_temp' will be appended to the password before updating it. Then, in the login function,
+    if the password begins with '_temp', the user role will be set to temp-pwd and the only function
+    they will be served in this role is the patch password route. This is to ensure that the user
+    changes their password before they can access other functions.
 
     Args:
-        request (Request): The request object.
+        request (Request): The request object. 
         user_request (UserRole): The password update request.
         user_manager (UserManager): The user manager dependency.
 
@@ -545,16 +560,26 @@ async def update_user_password(request: Request,
         dict: A message indicating successful update of the user's password.
     """
     try:
-        if request.state.role == "customer":
+        pwd = user_request.password
+        salt = os.urandom(32).hex()
+        if request.state.role != "admin":
             user_request.username = request.state.user
+        
+        if request.state.role == "admin" and user_request.username is not request.state.user:
+            pwd = '_temp'+pwd
+        
+            
+        # if request.state.role == "customer":
+        #     user_request.username = request.state.user
 
-        if user_request.salt == None and user_request.password == None:
-            user_request.salt = "random_salt"
-            user_request.password = "temp"
-        elif user_request.salt == None:
-            user_request.salt = os.urandom(32).hex()
+        # if user_request.salt == None and user_request.password == None:
+        #     user_request.salt = "random_salt"
+        #     user_request.password = "temp"
+        # elif user_request.salt == None:
+        #     user_request.salt = os.urandom(32).hex()
+        user_manager.update_password(user_request.username, pwd, salt)
 
-        user_manager.update_password(user_request.username, user_request.password, user_request.salt)
+        # user_manager.update_password(user_request.username, user_request.password, user_request.salt)
         log_operation(request.state.user,
                       "change user password", 
                       f"Password changed for {user_request.username}", 

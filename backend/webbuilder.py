@@ -119,7 +119,7 @@ class WebBuilder:
             },
             {
                 "name": "Reset Password",
-                "roles": ["admin", "scheduler","customer"],
+                "roles": ["admin", "scheduler","customer", "_temp"],
                 "route": "/users/password",
                 "method": "PATCH",
                 "inputs": [
@@ -137,14 +137,6 @@ class WebBuilder:
                         "validate": "password",
                         "optional": False,
                         "error_message": "Invalid password format. Please try again."
-                    },
-                    {
-                        "prompt": "Enter a salt",
-                        "tag": "salt",
-                        "roles": ["admin"],
-                        "validate": "string",
-                        "optional": True,
-                        "error_message": "Invalid salt format. Please try again."
                     }
                 ]
             },
@@ -179,12 +171,6 @@ class WebBuilder:
                         "prompt": "Enter new password",
                         "tag": "password",
                         "validate": "password",
-                        "error_message": "Invalid password format. Please try again."
-                    },
-                    {
-                        "prompt": "Salt",
-                        "tag": "salt",
-                        "validate": "string",
                         "error_message": "Invalid password format. Please try again."
                     }
                 ]
