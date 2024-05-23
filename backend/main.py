@@ -322,8 +322,8 @@ async def add_reservation(request: Request,
                       datetime.now())
         return {"message": "Reservation added successfully!"}
     
-    # except ValueError as e:
-    #     attempt_remote_reservation(reservation) # change this to catch specific error of no availability
+    except ValueError as e:
+        attempt_remote_reservation(reservation) # change this to catch specific error of no availability
    
     except Exception as e:
         
