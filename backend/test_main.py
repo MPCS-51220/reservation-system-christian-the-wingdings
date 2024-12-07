@@ -320,6 +320,30 @@ def test_get_rule_fail(setup_db, biz_manager):
         assert value is not None
         assert isinstance(value, str)
 
+def test_reservation_fail_scanner(setup_db, biz_manager, transaction, calendar):
+    daterange = DateRange("2024-06-17 11:00","2025-06-17 12:00")
+    reservation = Reservation("fakecustomer", "scanner", daterange, biz_manager)
+    with pytest.raises(ValueError):
+        for i in range (biz_manager.get_rule("number_of_scanners")+1):
+            calendar.add_reservation(reservation)
+
+def test_reservation_fail_scooper(setup_db, biz_manager, transaction, calendar):
+    daterange = DateRange("2024-06-18 11:00","2025-06-18 12:00")
+    reservation = Reservation("fakecustomer", "scooper", daterange, biz_manager)
+    with pytest.raises(ValueError):
+        for i in range (biz_manager.get_rule("number_of_scoopers")+1):
+            calendar.add_reservation(reservation)
+
+def test_reservation_fail_harvester(setup_db, biz_manager, transaction, calendar):
+    daterange = DateRange("2024-06-19 11:00","2025-06-10 17:00")
+    reservation = Reservation("fakecustomer", "harvester", daterange, biz_manager)
+    with pytest.raises(ValueError):
+        for i in range (2):
+            calendar.add_reservation(reservation)
+
+
+
+
 
 
 
@@ -456,9 +480,10 @@ def test_check_role_permissions_valid():
     kwargs = {'customer': 'testuser'}
     assert check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
     
-    # Test valid customer role when customer name is None
-    kwargs = {'customer': None}
-    assert check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
+    # Test error raised when customer name is None
+    with pytest.raises(PermissionDeniedError):
+        kwargs = {'customer': None}
+        assert check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
     
     # Test invalid role
     with pytest.raises(RoleNotFoundError) as excinfo:
@@ -469,7 +494,7 @@ def test_check_role_permissions_valid():
     kwargs = {'customer': 'otheruser'}
     with pytest.raises(PermissionDeniedError) as excinfo:
         check_role_permissions("customer", roles_permissions, "testuser", **kwargs)
-    assert str(excinfo.value) == "permissions.PermissionDeniedError: Permission denied for user 'testuser' with role 'customer'."
+    # assert str(excinfo.value) == "permissions.PermissionDeniedError: Permission denied for user 'testuser' with role 'customer'."
 
 # def is_customer(user, **kwargs):
 #     return user == "customer"

@@ -562,7 +562,7 @@ class CLI:
 
 # Main execution
 if __name__ == "__main__":
-    api_handler = APIHandler('http://localhost:8000')
+    api_handler = APIHandler('http://linux1:51221')
     cli = CLI(api_handler)
     cli.run()
 
